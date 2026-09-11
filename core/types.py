@@ -51,6 +51,9 @@ REASON_CODES: dict[str, str] = {
         "capacity. This is a sizing shortfall, not a dispatch choice."
     ),
     "R0_NOMINAL": "Renewables are covering demand.",
+    "R9_DIESEL_ONLY": (
+        "Diesel running continuously — this baseline does not use solar, wind or battery."
+    ),
 }
 
 
