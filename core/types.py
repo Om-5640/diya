@@ -209,6 +209,28 @@ class RunResult(BaseModel):
     notes: str = ""
 
 
+class DispatchPlan(BaseModel):
+    """Output of a single-horizon MILP solve. Power kW, energy kWh, fuel L."""
+
+    horizon_hours: int
+    pv_use_kw: list[float]
+    wind_use_kw: list[float]
+    dg_kw: list[float]
+    dg_on: list[int]  # 0/1
+    dg_start: list[int]  # 0/1
+    p_charge_kw: list[float]
+    p_discharge_kw: list[float]
+    soc_kwh: list[float]  # end-of-step SOC, length == horizon_hours
+    unserved_critical_kwh: list[float]
+    unserved_essential_kwh: list[float]
+    unserved_deferrable_kwh: list[float]
+    curtailed_kwh: list[float]
+    fuel_l: list[float]
+    solve_status: str  # "Optimal" | "Infeasible" | "Timeout" | "Error"
+    solve_ms: float
+    objective_value: float
+
+
 # ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
