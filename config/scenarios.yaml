@@ -1,0 +1,42 @@
+# DIYA scenario definitions — all at site khavda_01.
+#
+# start_date / end_date are TODO placeholders. Phase 1 will fill these in
+# after inspecting real weather data to pick a representative 7-day window
+# for S1/S3 and a monsoon window containing >= 2 consecutive low-irradiance
+# days for S2.
+
+scenarios:
+  - id: S1
+    name: "Normal week"
+    start_date: "TODO"  # Phase 1: pick a representative clear/mixed 7-day window
+    end_date: "TODO"
+    description: >
+      A representative clear/mixed week at Khavda with no unusual weather
+      or load conditions. Baseline for comparing dispatch policies.
+    diesel_price_multiplier: 1.0
+    load_multiplier: 1.0
+    k_uncertainty: 1.0
+
+  - id: S2
+    name: "Monsoon stretch"
+    start_date: "TODO"  # Phase 1: pick a 7-day window with >= 2 consecutive low-irradiance days
+    end_date: "TODO"
+    description: >
+      HERO SCENARIO. A week containing at least two consecutive
+      low-irradiance days (monsoon cloud cover), stressing the battery
+      and diesel dispatch to protect critical (health-centre) load.
+    diesel_price_multiplier: 1.0
+    load_multiplier: 1.0
+    k_uncertainty: 1.0
+
+  - id: S3
+    name: "Lean season"
+    start_date: "TODO"  # Phase 1: same weather window as S1
+    end_date: "TODO"    # Phase 1: same weather window as S1
+    description: >
+      Same weather window as S1 (Normal week), but with elevated diesel
+      price and elevated load to model a lean-season / high-cost operating
+      regime.
+    diesel_price_multiplier: 1.4
+    load_multiplier: 1.2
+    k_uncertainty: 1.0

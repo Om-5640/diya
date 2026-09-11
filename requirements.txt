@@ -1,0 +1,17 @@
+# NOTE: numpy and pyarrow are bumped from the originally specified 1.26.*/17.*
+# pins because this environment's only available interpreter is Python 3.13,
+# and neither of those release lines ships a cp313 wheel (nor builds from
+# source here — numpy's Meson build requires GCC >= 8.4, older than the local
+# MinGW toolchain). Bumped to the nearest release line with cp313 wheels.
+# Revisit if the project later standardizes on Python <=3.12.
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+pydantic==2.9.*
+pyyaml==6.*
+pandas==2.2.*
+pyarrow==18.*
+numpy==2.1.*
+pvlib==0.11.*
+PuLP==2.9.*
+pytest==8.*
+requests==2.32.*

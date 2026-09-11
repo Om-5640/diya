@@ -1,0 +1,82 @@
+# DIYA site configuration — Khavda, Kutch, Gujarat, India
+#
+# UNIT CONVENTION: timestep is exactly 1 hour. All power is kW, all energy is
+# kWh. Every value below carries its unit in the key name.
+#
+# VALUE PROVENANCE (read before trusting a number in a demo or report):
+#
+#   MEASURED (site/geographic facts, effectively ground truth):
+#     - lat, lon, elevation_m, timezone
+#
+#   PUBLIC REFERENCE (from vendor datasheets / public specs, not site-measured):
+#     - pv.capacity_kwp, pv.tilt_deg, pv.azimuth_deg, pv.temp_coeff_per_c, pv.derate
+#     - wind.rated_kw, wind.hub_height_m, wind.cut_in_ms, wind.rated_ms,
+#       wind.cut_out_ms, wind.shear_exp
+#     - battery.capacity_kwh, battery.soc_min_pct, battery.soc_max_pct,
+#       battery.p_charge_max_kw, battery.p_discharge_max_kw,
+#       battery.eta_charge, battery.eta_discharge, battery.soc_init_pct
+#     - diesel.rated_kw, diesel.min_load_frac, diesel.co2_kg_per_l
+#     - economics.diesel_price_inr_per_l (PPAC Gujarat retail — see source note below)
+#
+#   ENGINEERING ASSUMPTION (not measured, not from a public spec sheet —
+#   PLACEHOLDER values chosen to be plausible; verify before using in any
+#   real financial or dispatch decision):
+#     - diesel.fuel_a_l_per_kw_h (idle fuel coefficient)
+#     - diesel.fuel_b_l_per_kwh (marginal fuel coefficient)
+#     - diesel.start_cost_inr
+#     - economics.co2_price_inr_per_kg
+#     - economics.voll_critical_inr_per_kwh
+#     - economics.voll_essential_inr_per_kwh
+#     - economics.voll_deferrable_inr_per_kwh
+
+site_id: khavda_01
+name: "Khavda Off-Grid Microgrid"
+lat: 23.8443
+lon: 69.7317
+elevation_m: 15
+timezone: "Asia/Kolkata"
+
+pv:
+  capacity_kwp: 60
+  tilt_deg: 24
+  azimuth_deg: 180
+  temp_coeff_per_c: -0.004
+  derate: 0.90
+
+wind:
+  rated_kw: 10
+  hub_height_m: 18
+  cut_in_ms: 3.0
+  rated_ms: 11.0
+  cut_out_ms: 20.0
+  shear_exp: 0.14
+
+battery:
+  capacity_kwh: 120
+  soc_min_pct: 20
+  soc_max_pct: 95
+  p_charge_max_kw: 40
+  p_discharge_max_kw: 40
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  soc_init_pct: 60
+
+diesel:
+  rated_kw: 25
+  min_load_frac: 0.30
+  fuel_a_l_per_kw_h: 0.08   # ASSUMPTION — idle fuel coefficient, verify against genset test data
+  fuel_b_l_per_kwh: 0.25    # ASSUMPTION — marginal fuel coefficient, verify against genset test data
+  start_cost_inr: 150       # ASSUMPTION — placeholder start cost
+  co2_kg_per_l: 2.68
+
+economics:
+  diesel_price_inr_per_l: 92.5
+  diesel_price_source: "PPAC Gujarat retail selling price — PLACEHOLDER, verify before demo"
+  co2_price_inr_per_kg: 2.0             # ASSUMPTION — placeholder shadow price of carbon
+  voll_critical_inr_per_kwh: 500        # ASSUMPTION — value of lost load, health centre
+  voll_essential_inr_per_kwh: 60        # ASSUMPTION — value of lost load, essential loads
+  voll_deferrable_inr_per_kwh: 12       # ASSUMPTION — value of lost load, deferrable loads
+
+horizon_hours: 24
+reserve_hours: 3
+k_uncertainty: 1.0
