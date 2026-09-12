@@ -3,26 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --bg-base: #0b1220;
-  --bg-panel: #111c2e;
-  --bg-panel-raised: #16233a;
-  --border-subtle: #22314a;
-  --border-strong: #34496b;
-  --text-primary: #e8edf5;
-  --text-secondary: #9aacc7;
-  --text-tertiary: #62759a;
-  --accent-solar: #f5a524;
-  --accent-wind: #38bdf8;
-  --accent-battery: #a78bfa;
-  --accent-diesel: #fb7c3c;
-  --status-good: #22c55e;
-  --status-warn: #f5a524;
-  --status-critical: #ef4444;
+  --bg-canvas: #fafaf8;
+  --bg-surface: #ffffff;
+  --bg-surface-sunken: #f2f1ed;
+  --border-subtle: #e4e2dc;
+  --border-strong: #c9c6bc;
+  --text-primary: #1a1a18;
+  --text-secondary: #55534c;
+  --text-tertiary: #8a877d;
+
+  /* DIYA's one signature color: deep forest green. Chosen over the more
+     common indigo/violet "AI tool" default specifically because it ties
+     directly to the subject -- off-grid solar/wind/battery generation is
+     literally a green-energy system, and a muted forest green reads as
+     considered/editorial rather than as a generic SaaS brand color. */
+  --brand: #1b4332;
+
+  /* Desaturated, "field notebook" accent colors -- deliberately not the
+     saturated neon tones typical of dashboard UIs. */
+  --accent-solar: #c67c1e;
+  --accent-wind: #2a6f7f;
+  --accent-battery: #6b5b95;
+  --accent-diesel: #a44a3f;
+
+  --status-good: #2f6b3f;
+  --status-warn: #b8722a;
+  --status-critical: #b23a2e;
 }
 
 html,
 body {
-  background-color: var(--bg-base);
+  background-color: var(--bg-canvas);
   color: var(--text-primary);
 }
 
@@ -31,11 +42,15 @@ body {
   margin: 0;
 }
 
+.font-serif {
+  font-family: "Newsreader", Georgia, serif;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Cross-fade for KPI values on change, per spec: 150ms, no snapping. */
+/* Cross-fade for metric values on change: 150ms, no snapping. */
 .kpi-fade {
   animation: kpi-fade-in 150ms ease-out;
 }
@@ -46,5 +61,48 @@ body {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* Village visual "the system is alive" motion: wind turbine rotation,
+   solar-active pulse, and the battery-fill width transition (applied
+   inline via a transition-[width] utility on that element). All three
+   respect prefers-reduced-motion below. */
+@keyframes turbine-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.turbine-blades-active {
+  animation: turbine-spin 6s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes solar-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.solar-outline-active {
+  animation: solar-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turbine-blades-active,
+  .solar-outline-active,
+  .kpi-fade {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.001ms !important;
   }
 }

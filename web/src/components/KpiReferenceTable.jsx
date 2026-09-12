@@ -27,7 +27,7 @@ function fmt(value, decimals) {
 
 /**
  * Dense 4-way KPI reference table. The mpc column gets a subtle top+bottom
- * accent-battery border since it's the benchmark column.
+ * brand-green border since it's the benchmark column.
  */
 export default function KpiReferenceTable({ runs }) {
   return (
@@ -35,12 +35,12 @@ export default function KpiReferenceTable({ runs }) {
       <table className="w-full text-body tabular-nums border-collapse">
         <thead>
           <tr>
-            <th className="text-left text-h2 font-semibold uppercase text-text-tertiary pb-2 pr-4">Metric</th>
+            <th className="text-left text-label uppercase text-text-tertiary pb-2 pr-4">Metric</th>
             {POLICIES.map((p) => (
               <th
                 key={p}
-                className={`text-right text-h2 font-semibold uppercase text-text-tertiary pb-2 pl-4 whitespace-nowrap ${
-                  p === "mpc" ? "border-t border-b border-accent-battery" : ""
+                className={`text-right text-label uppercase text-text-tertiary pb-2 pl-4 whitespace-nowrap ${
+                  p === "mpc" ? "border-t border-b border-brand" : ""
                 }`}
               >
                 {POLICY_LABELS[p]}
@@ -56,7 +56,7 @@ export default function KpiReferenceTable({ runs }) {
                 <td
                   key={p}
                   className={`text-right py-2 pl-4 text-text-primary ${
-                    p === "mpc" ? "border-l border-r border-accent-battery/40" : ""
+                    p === "mpc" ? "border-l border-r border-brand/40" : ""
                   }`}
                 >
                   {fmt(runs[p]?.kpi?.[row.key], row.decimals)}

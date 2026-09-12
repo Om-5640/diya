@@ -5,12 +5,13 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
       },
       colors: {
         bg: {
-          base: "var(--bg-base)",
-          panel: "var(--bg-panel)",
-          "panel-raised": "var(--bg-panel-raised)",
+          canvas: "var(--bg-canvas)",
+          surface: "var(--bg-surface)",
+          "surface-sunken": "var(--bg-surface-sunken)",
         },
         border: {
           subtle: "var(--border-subtle)",
@@ -21,6 +22,7 @@ export default {
           secondary: "var(--text-secondary)",
           tertiary: "var(--text-tertiary)",
         },
+        brand: "var(--brand)",
         accent: {
           solar: "var(--accent-solar)",
           wind: "var(--accent-wind)",
@@ -34,15 +36,20 @@ export default {
         },
       },
       fontSize: {
-        display: ["32px", { lineHeight: "38px" }],
-        h1: ["20px", { lineHeight: "28px" }],
-        h2: ["13px", { lineHeight: "18px", letterSpacing: "0.04em" }],
-        body: ["14px", { lineHeight: "20px" }],
-        meta: ["12px", { lineHeight: "16px" }],
+        statement: ["28px", { lineHeight: "36px", fontWeight: "500" }],
+        title: ["22px", { lineHeight: "28px", fontWeight: "600" }],
+        label: ["12px", { lineHeight: "16px", letterSpacing: "0.06em", fontWeight: "600" }],
+        metric: ["34px", { lineHeight: "40px", fontWeight: "600" }],
+        body: ["15px", { lineHeight: "22px" }],
+        small: ["12.5px", { lineHeight: "18px" }],
+      },
+      boxShadow: {
+        elevated: "0 2px 8px rgba(0,0,0,0.06)",
       },
       transitionDuration: {
-        140: "140ms",
+        120: "120ms",
         150: "150ms",
+        180: "180ms",
       },
     },
   },

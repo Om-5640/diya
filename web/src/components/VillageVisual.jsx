@@ -1,7 +1,9 @@
 /**
  * Hand-built SVG village scene, driven entirely by props derived from the
- * current step. Static/diagrammatic on purpose -- no animation loops, no
- * rotating blades: it must read instantly, not entertain.
+ * current step. Three deliberate motion cues read as "the system is alive":
+ * the turbine blades rotate when windActive, the solar panel outline pulses
+ * when solarActive, and the battery fill transitions smoothly on soc_pct
+ * change -- all disabled under prefers-reduced-motion via index.css.
  */
 export default function VillageVisual({ solarActive, windActive, dieselActive, batteryPct, criticalOK }) {
   const pct = Math.max(0, Math.min(100, batteryPct ?? 0));
@@ -10,26 +12,26 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
   return (
     <svg viewBox="0 0 900 300" className="w-full h-auto" role="img" aria-label="Village power system diagram">
       {/* ground */}
-      <line x1="0" y1="270" x2="900" y2="270" stroke="var(--border-subtle)" strokeWidth="2" />
+      <line x1="0" y1="270" x2="900" y2="270" stroke="var(--border-strong)" strokeWidth="2" />
 
       {/* households, abstracted as a row of houses */}
       {[50, 115, 180, 245].map((x, i) => (
         <g key={i}>
-          <rect x={x} y={225} width={48} height={45} fill="var(--bg-panel-raised)" stroke="var(--border-subtle)" strokeWidth="1.5" />
+          <rect x={x} y={225} width={48} height={45} fill="var(--bg-surface-sunken)" stroke="var(--border-strong)" strokeWidth="1.5" />
           <polygon
             points={`${x - 6},225 ${x + 24},198 ${x + 54},225`}
-            fill="var(--bg-panel-raised)"
-            stroke="var(--border-subtle)"
+            fill="var(--bg-surface-sunken)"
+            stroke="var(--border-strong)"
             strokeWidth="1.5"
           />
-          <rect x={x + 18} y={244} width={12} height={26} fill="var(--bg-base)" />
+          <rect x={x + 18} y={244} width={12} height={26} fill="var(--bg-canvas)" />
         </g>
       ))}
 
       {/* health centre */}
       <g>
-        <rect x={335} y={190} width={110} height={80} fill="var(--bg-panel-raised)" stroke="var(--border-strong)" strokeWidth="2" />
-        <polygon points="329,190 390,158 451,190" fill="var(--bg-panel-raised)" stroke="var(--border-strong)" strokeWidth="2" />
+        <rect x={335} y={190} width={110} height={80} fill="var(--bg-surface-sunken)" stroke="var(--text-secondary)" strokeWidth="2" />
+        <polygon points="329,190 390,158 451,190" fill="var(--bg-surface-sunken)" stroke="var(--text-secondary)" strokeWidth="2" />
         <rect
           x={372}
           y={210}
@@ -38,8 +40,8 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
           fill={criticalOK ? "var(--status-good)" : "var(--status-critical)"}
           fillOpacity={0.85}
         />
-        <rect x={385} y={217} width={10} height={18} fill="var(--bg-panel)" />
-        <rect x={378} y={223} width={24} height={6} fill="var(--bg-panel)" />
+        <rect x={385} y={217} width={10} height={18} fill="var(--bg-surface)" />
+        <rect x={378} y={223} width={24} height={6} fill="var(--bg-surface)" />
         <text x={390} y={285} textAnchor="middle" fontSize="12" fill="var(--text-tertiary)" fontFamily="Inter, sans-serif">
           HEALTH CENTRE
         </text>
@@ -52,10 +54,11 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
           y={205}
           width={95}
           height={48}
-          fill={solarActive ? "var(--accent-solar)" : "var(--bg-panel-raised)"}
-          fillOpacity={solarActive ? 0.85 : 1}
-          stroke={solarActive ? "var(--accent-solar)" : "var(--border-subtle)"}
+          fill={solarActive ? "var(--accent-solar)" : "var(--bg-surface-sunken)"}
+          fillOpacity={solarActive ? 0.8 : 1}
+          stroke={solarActive ? "var(--accent-solar)" : "var(--border-strong)"}
           strokeWidth="1.5"
+          className={solarActive ? "solar-outline-active" : ""}
           transform="skewX(-10)"
         />
         {[0, 1, 2, 3].map((i) => (
@@ -65,11 +68,11 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
             y1={205}
             x2={505 + i * 24 - 8}
             y2={253}
-            stroke="var(--bg-base)"
+            stroke="var(--bg-canvas)"
             strokeWidth="1"
           />
         ))}
-        <line x1={552} y1={253} x2={552} y2={270} stroke="var(--border-subtle)" strokeWidth="3" />
+        <line x1={552} y1={253} x2={552} y2={270} stroke="var(--border-strong)" strokeWidth="3" />
         <text x={552} y={288} textAnchor="middle" fontSize="12" fill="var(--text-tertiary)" fontFamily="Inter, sans-serif">
           SOLAR
         </text>
@@ -77,20 +80,22 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
 
       {/* wind turbine */}
       <g>
-        <line x1={660} y1={270} x2={660} y2={150} stroke="var(--border-strong)" strokeWidth="4" />
-        <circle cx={660} cy={150} r={5} fill={windActive ? "var(--accent-wind)" : "var(--text-tertiary)"} />
-        {[0, 120, 240].map((deg) => (
-          <line
-            key={deg}
-            x1={660}
-            y1={150}
-            x2={660 + 40 * Math.cos((deg * Math.PI) / 180)}
-            y2={150 + 40 * Math.sin((deg * Math.PI) / 180)}
-            stroke={windActive ? "var(--accent-wind)" : "var(--text-tertiary)"}
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-        ))}
+        <line x1={660} y1={270} x2={660} y2={150} stroke="var(--text-secondary)" strokeWidth="4" />
+        <g style={{ transformOrigin: "660px 150px" }} className={windActive ? "turbine-blades-active" : ""}>
+          <circle cx={660} cy={150} r={5} fill={windActive ? "var(--accent-wind)" : "var(--text-tertiary)"} />
+          {[0, 120, 240].map((deg) => (
+            <line
+              key={deg}
+              x1={660}
+              y1={150}
+              x2={660 + 40 * Math.cos((deg * Math.PI) / 180)}
+              y2={150 + 40 * Math.sin((deg * Math.PI) / 180)}
+              stroke={windActive ? "var(--accent-wind)" : "var(--text-tertiary)"}
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          ))}
+        </g>
         <text x={660} y={288} textAnchor="middle" fontSize="12" fill="var(--text-tertiary)" fontFamily="Inter, sans-serif">
           WIND
         </text>
@@ -98,8 +103,8 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
 
       {/* battery */}
       <g>
-        <rect x={735} y={200} width={52} height={70} fill="none" stroke="var(--border-strong)" strokeWidth="2" />
-        <rect x={753} y={192} width={16} height={8} fill="var(--border-strong)" />
+        <rect x={735} y={200} width={52} height={70} fill="none" stroke="var(--text-secondary)" strokeWidth="2" />
+        <rect x={753} y={192} width={16} height={8} fill="var(--text-secondary)" />
         <rect
           x={737}
           y={270 - battFillHeight}
@@ -107,6 +112,7 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
           height={battFillHeight}
           fill="var(--accent-battery)"
           fillOpacity={0.75}
+          style={{ transition: "height 300ms ease-out, y 300ms ease-out" }}
         />
         <text x={761} y={288} textAnchor="middle" fontSize="12" fill="var(--text-tertiary)" fontFamily="Inter, sans-serif">
           BATTERY {Math.round(pct)}%
@@ -120,11 +126,11 @@ export default function VillageVisual({ solarActive, windActive, dieselActive, b
           y={225}
           width={62}
           height={45}
-          fill="var(--bg-panel-raised)"
-          stroke={dieselActive ? "var(--accent-diesel)" : "var(--border-subtle)"}
+          fill="var(--bg-surface-sunken)"
+          stroke={dieselActive ? "var(--accent-diesel)" : "var(--border-strong)"}
           strokeWidth="2"
         />
-        <rect x={865} y={210} width={8} height={20} fill="var(--border-strong)" />
+        <rect x={865} y={210} width={8} height={20} fill="var(--text-secondary)" />
         {dieselActive && (
           <>
             <circle cx={873} cy={198} r={4} fill="var(--text-tertiary)" opacity={0.55} />
