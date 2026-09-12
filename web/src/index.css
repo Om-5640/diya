@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-base: #0b1220;
+  --bg-panel: #111c2e;
+  --bg-panel-raised: #16233a;
+  --border-subtle: #22314a;
+  --border-strong: #34496b;
+  --text-primary: #e8edf5;
+  --text-secondary: #9aacc7;
+  --text-tertiary: #62759a;
+  --accent-solar: #f5a524;
+  --accent-wind: #38bdf8;
+  --accent-battery: #a78bfa;
+  --accent-diesel: #fb7c3c;
+  --status-good: #22c55e;
+  --status-warn: #f5a524;
+  --status-critical: #ef4444;
+}
+
+html,
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  margin: 0;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cross-fade for KPI values on change, per spec: 150ms, no snapping. */
+.kpi-fade {
+  animation: kpi-fade-in 150ms ease-out;
+}
+
+@keyframes kpi-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
