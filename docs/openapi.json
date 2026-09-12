@@ -617,6 +617,345 @@
           }
         }
       }
+    },
+    "/api/geocode": {
+      "post": {
+        "summary": "Geocode",
+        "description": "Forward geocode a free-text place name via OpenStreetMap Nominatim\n(server-side only -- see core/geocode.py for why this must never be\ncalled directly from browser JS).\n\nExample request body: {\"query\": \"Bhuj, Gujarat\"}\n\nErrors: 404 if Nominatim has no result for the query. 502 if Nominatim\nitself is unreachable -- never fabricates a lat/lon in either case.",
+        "operationId": "geocode_api_geocode_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeocodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeocodeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geocode/reverse": {
+      "post": {
+        "summary": "Geocode Reverse Route",
+        "description": "Reverse geocode a (lat, lon) pair into a human-readable place name via\nOpenStreetMap Nominatim (server-side only, see core/geocode.py).\n\nExample request body: {\"lat\": 23.2419, \"lon\": 69.6669}\n\nErrors: 404 if Nominatim has no result for the coordinates. 502 if\nNominatim itself is unreachable -- never fabricates a display_name.",
+        "operationId": "geocode_reverse_route_api_geocode_reverse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeocodeReverseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeocodeReverseResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/overview": {
+      "get": {
+        "summary": "Site Overview",
+        "description": "One-call dashboard summary for a site: its registry summary, the\ncurrent hour's dispatch step (the first step of a fresh 72h live solve\n-- the exact same _solve_live internal that POST /solve_live uses, not\na duplicate), and whether it has precomputed scenario runs yet.\n\n`status` is exactly \"live_only\" (no precomputed runs -- the honest\ndescription of a brand-new site; NOT \"building_baseline\", since no\nbackground job producing one exists until Phase E) or \"full\".\n\nErrors: 404 if site_id is not registered.",
+        "operationId": "site_overview_api_sites__site_id__overview_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/dispatch": {
+      "get": {
+        "summary": "Site Dispatch",
+        "description": "Dispatch steps for charting, from whichever source this site\nactually has: a precomputed run's steps (truncated to `range` hours from\nthe start) if any exist, otherwise a fresh live solve.\n\nExample: GET /api/sites/khavda/dispatch?range=72\n\nIf precomputed runs exist: `scenario` defaults to the first one from\nGET .../scenarios, `policy` defaults to \"mpc\".\n\nIf NO precomputed runs exist (a brand-new site): range<=72 falls back to\nthe same live solve /overview uses (always the full 72h it produces,\nregardless of the exact range<=72 requested); range=168 is refused\nrather than fabricated from a 72h live solve.\n\nErrors: 404 if site_id is not registered, if no scenarios/runs are\navailable to satisfy a precomputed request, or if range=168 is\nrequested for a site with no precomputed runs (\"Full week analysis\nrequires historical scenario data, not yet available for this site\").\n422 if range is anything other than 72 or 168.",
+        "operationId": "site_dispatch_api_sites__site_id__dispatch_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 168,
+              "title": "Range"
+            }
+          },
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "policy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "mpc",
+              "title": "Policy"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/evidence": {
+      "get": {
+        "summary": "Site Evidence",
+        "description": "The four-policy comparison (rule_based / mpc / diesel_only /\nperfect_foresight) for one scenario, plus a server-computed delta block\n-- the frontend must never compute these deltas itself.\n\nExample: GET /api/sites/khavda/evidence?scenario=S2\n\n`scenario` defaults to the first available from GET .../scenarios.\n`description` is read directly from config/scenarios.yaml (khavda only,\nnever duplicated/hardcoded elsewhere); null for sites with no\nscenarios.yaml-equivalent yet -- never invented.\n\nErrors: 404 if site_id is not registered, if it has no precomputed runs\nat all, or if the chosen scenario is missing any of the 4 required\npolicy runs.",
+        "operationId": "site_evidence_api_sites__site_id__evidence_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/export": {
+      "get": {
+        "summary": "Site Export",
+        "description": "Download one precomputed run's steps as a file: CSV (one row per\nstep, columns exactly matching StepResult's fields, in order) or JSON\n(the raw steps array). Content-Disposition is set so a browser triggers\na save-as-file download rather than rendering the response inline.\n\nExample: GET /api/sites/khavda/export?scenario=S2&policy=mpc&format=csv\n\nErrors: 404 if site_id is not registered or the run doesn't exist.",
+        "operationId": "site_export_api_sites__site_id__export_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "policy",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Policy"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "csv",
+                "json"
+              ],
+              "type": "string",
+              "default": "csv",
+              "title": "Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/methodology": {
+      "get": {
+        "summary": "Methodology",
+        "description": "DIYA's general (not site-specific) data-provenance methodology:\nwhich numbers are measured/live, which are public-reference constants,\nand which are engineering-assumption placeholders -- the same\ncategorization already documented in config/site_khavda.yaml's comment\nblock, returned as structured data from ONE source of truth\n(core/types.py::METHODOLOGY_NOTES) instead of being duplicated here.\n\nFixed, deterministic response -- no error cases.",
+        "operationId": "methodology_api_methodology_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MethodologyNotes"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -670,6 +1009,24 @@
         "title": "BatterySpec",
         "description": "Battery energy storage spec. Power in kW, energy in kWh, dt = 1h."
       },
+      "DeltaValue": {
+        "properties": {
+          "raw": {
+            "type": "number",
+            "title": "Raw"
+          },
+          "avoided": {
+            "type": "number",
+            "title": "Avoided"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw",
+          "avoided"
+        ],
+        "title": "DeltaValue"
+      },
       "DieselSpec": {
         "properties": {
           "rated_kw": {
@@ -709,6 +1066,51 @@
         "title": "DieselSpec",
         "description": "Diesel genset spec. Power in kW, fuel in L, dt = 1h."
       },
+      "DispatchResponse": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "policy": {
+            "type": "string",
+            "title": "Policy"
+          },
+          "range_hours": {
+            "type": "integer",
+            "title": "Range Hours"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "precomputed",
+              "live"
+            ],
+            "title": "Source"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepResult"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "scenario_id",
+          "policy",
+          "range_hours",
+          "source",
+          "steps"
+        ],
+        "title": "DispatchResponse"
+      },
       "EconomicsSpec": {
         "properties": {
           "diesel_price_inr_per_l": {
@@ -747,6 +1149,155 @@
         ],
         "title": "EconomicsSpec",
         "description": "Economic parameters. Prices in INR, energy in kWh, mass in kg."
+      },
+      "EvidenceDelta": {
+        "properties": {
+          "diesel_l": {
+            "$ref": "#/components/schemas/DeltaValue"
+          },
+          "cost_total_inr": {
+            "$ref": "#/components/schemas/DeltaValue"
+          },
+          "co2_kg": {
+            "$ref": "#/components/schemas/DeltaValue"
+          },
+          "critical_outage_hours": {
+            "$ref": "#/components/schemas/DeltaValue"
+          },
+          "renewable_frac": {
+            "$ref": "#/components/schemas/DeltaValue"
+          },
+          "dg_starts": {
+            "$ref": "#/components/schemas/DeltaValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diesel_l",
+          "cost_total_inr",
+          "co2_kg",
+          "critical_outage_hours",
+          "renewable_frac",
+          "dg_starts"
+        ],
+        "title": "EvidenceDelta"
+      },
+      "EvidenceResponse": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "rule_based": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "mpc": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "diesel_only": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "perfect_foresight": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "delta": {
+            "$ref": "#/components/schemas/EvidenceDelta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "scenario_id",
+          "description",
+          "rule_based",
+          "mpc",
+          "diesel_only",
+          "perfect_foresight",
+          "delta"
+        ],
+        "title": "EvidenceResponse"
+      },
+      "GeocodeRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "GeocodeRequest"
+      },
+      "GeocodeResult": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon",
+          "display_name"
+        ],
+        "title": "GeocodeResult"
+      },
+      "GeocodeReverseRequest": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "title": "GeocodeReverseRequest"
+      },
+      "GeocodeReverseResult": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "title": "GeocodeReverseResult"
       },
       "HTTPValidationError": {
         "properties": {
@@ -886,6 +1437,48 @@
         ],
         "title": "LiveSolveRequest",
         "description": "Body for POST /api/solve_live."
+      },
+      "MethodologyCategory": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "items"
+        ],
+        "title": "MethodologyCategory"
+      },
+      "MethodologyNotes": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/MethodologyCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "load_note": {
+            "type": "string",
+            "title": "Load Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories",
+          "load_note"
+        ],
+        "title": "MethodologyNotes"
       },
       "NewSiteRequest": {
         "properties": {
@@ -1202,6 +1795,36 @@
           "health"
         ],
         "title": "ServiceInfo"
+      },
+      "SiteOverview": {
+        "properties": {
+          "site": {
+            "$ref": "#/components/schemas/SiteSummary"
+          },
+          "current_step": {
+            "$ref": "#/components/schemas/StepResult"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "live_only",
+              "full"
+            ],
+            "title": "Status"
+          },
+          "has_precomputed_runs": {
+            "type": "boolean",
+            "title": "Has Precomputed Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site",
+          "current_step",
+          "status",
+          "has_precomputed_runs"
+        ],
+        "title": "SiteOverview"
       },
       "SiteSummary": {
         "properties": {

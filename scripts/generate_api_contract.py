@@ -17,6 +17,16 @@ NOTE: this script calls the real POST /api/resolve once (khavda scenario
 S1), which is the genuinely slow ~60-65s rolling-MPC re-solve documented in
 api/main.py and FREEZE_NOTES.md -- expect this script to take about a
 minute to run, not seconds.
+
+GEOCODE EXAMPLES ARE THE ONE EXCEPTION TO "REAL NETWORK CALL": Nominatim
+returns 403 Forbidden from several sandboxed/CI network environments
+(observed directly while building Phase C.6 -- not a code bug, core/geocode.py
+correctly turns it into a 502), so a truly live call here would sometimes
+capture a network-block error instead of a representative success example.
+core.geocode.requests.get is mocked ONLY for this script's two geocode
+example captures (same technique tests/test_convenience_endpoints.py already
+uses for its geocode tests) -- every other example on every other route in
+this script is still a real, unmocked call through the real code path.
 """
 
 from __future__ import annotations
@@ -25,6 +35,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -64,6 +75,19 @@ SITE_SCOPED_ROUTES: list[tuple[str, str]] = [
     ("POST", "/api/sites/{site_id}/solve_live"),
     ("POST", "/api/sites/{site_id}/resolve"),
 ]
+# Phase C.6: aggregation/convenience endpoints. Grouped separately from the
+# two lists above since geocode/methodology aren't site-scoped at all, and
+# overview/dispatch/evidence/export -- while site-scoped in URL shape -- are
+# a distinct "compose existing results" layer on top of everything else.
+CONVENIENCE_ROUTES: list[tuple[str, str]] = [
+    ("POST", "/api/geocode"),
+    ("POST", "/api/geocode/reverse"),
+    ("GET", "/api/sites/{site_id}/overview"),
+    ("GET", "/api/sites/{site_id}/dispatch"),
+    ("GET", "/api/sites/{site_id}/evidence"),
+    ("GET", "/api/sites/{site_id}/export"),
+    ("GET", "/api/methodology"),
+]
 
 KHAVDA_LIVE_BODY = {"lat": 23.8443, "lon": 69.7317, "soc_pct": 60.0}
 KHAVDA_RESOLVE_BODY = {
@@ -88,7 +112,7 @@ def _safe_json(resp) -> Any:
         return None
 
 
-Example = dict  # {"description": str, "request": Any|None, "path": str, "status": int, "response": Any}
+Example = dict  # {"description", "request", "path", "status", "response", "is_text"}
 
 
 def _capture_examples() -> dict[tuple[str, str], list[Example]]:
@@ -99,8 +123,18 @@ def _capture_examples() -> dict[tuple[str, str], list[Example]]:
     examples: dict[tuple[str, str], list[Example]] = {}
 
     def record(method: str, template: str, path: str, resp, req_body=None, desc: str = "") -> None:
+        content_type = resp.headers.get("content-type", "")
+        is_text = not content_type.startswith("application/json")
+        response_payload = resp.text if is_text else _safe_json(resp)
         examples.setdefault((method, template), []).append(
-            {"description": desc, "path": path, "request": req_body, "status": resp.status_code, "response": _safe_json(resp)}
+            {
+                "description": desc,
+                "path": path,
+                "request": req_body,
+                "status": resp.status_code,
+                "response": response_payload,
+                "is_text": is_text,
+            }
         )
 
     # --- Legacy / global ---
@@ -250,6 +284,91 @@ def _capture_examples() -> dict[tuple[str, str], list[Example]]:
     del_resp = client.delete(f"/api/sites/{site_id}")
     record("DELETE", "/api/sites/{site_id}", f"/api/sites/{site_id}", del_resp, desc="Delete a non-seed site -> 204")
 
+    # --- Phase C.6: convenience endpoints ---
+
+    # Nominatim itself is mocked ONLY here -- see this script's module
+    # docstring (GEOCODE EXAMPLES...) for why.
+    fake_forward_resp = MagicMock()
+    fake_forward_resp.raise_for_status = lambda: None
+    fake_forward_resp.json = lambda: [{"lat": "23.2419", "lon": "69.6669", "display_name": "Bhuj, Kutch, Gujarat, India"}]
+    with patch("core.geocode.requests.get", return_value=fake_forward_resp):
+        forward_body = {"query": "Bhuj, Gujarat"}
+        record(
+            "POST", "/api/geocode", "/api/geocode",
+            client.post("/api/geocode", json=forward_body),
+            req_body=forward_body,
+            desc="Forward geocode a place name (Nominatim mocked for this capture only -- see script docstring)",
+        )
+
+    fake_reverse_resp = MagicMock()
+    fake_reverse_resp.raise_for_status = lambda: None
+    fake_reverse_resp.json = lambda: {"display_name": "Bhuj, Kutch, Gujarat, India"}
+    with patch("core.geocode.requests.get", return_value=fake_reverse_resp):
+        reverse_body = {"lat": 23.2419, "lon": 69.6669}
+        record(
+            "POST", "/api/geocode/reverse", "/api/geocode/reverse",
+            client.post("/api/geocode/reverse", json=reverse_body),
+            req_body=reverse_body,
+            desc="Reverse geocode coordinates (Nominatim mocked for this capture only -- see script docstring)",
+        )
+
+    # overview / dispatch / evidence / export -- khavda (has precomputed runs)
+    record(
+        "GET", "/api/sites/{site_id}/overview", "/api/sites/khavda/overview",
+        client.get("/api/sites/khavda/overview"),
+        desc="Khavda: status=full (has precomputed runs)",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/dispatch", "/api/sites/khavda/dispatch?range=72",
+        client.get("/api/sites/khavda/dispatch?range=72"),
+        desc="Khavda: precomputed source, truncated to 72h",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/evidence", "/api/sites/khavda/evidence?scenario=S2",
+        client.get("/api/sites/khavda/evidence?scenario=S2"),
+        desc="Khavda: 4-policy comparison + server-computed delta for scenario S2",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/export", "/api/sites/khavda/export?scenario=S2&policy=mpc&format=csv",
+        client.get("/api/sites/khavda/export?scenario=S2&policy=mpc&format=csv"),
+        desc="Khavda: CSV export of S2/mpc's steps",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/export", "/api/sites/khavda/export?scenario=S2&policy=mpc&format=json",
+        client.get("/api/sites/khavda/export?scenario=S2&policy=mpc&format=json"),
+        desc="Khavda: JSON export of the same run",
+    )
+
+    # A second throwaway site (the first, created earlier, is already
+    # deleted) to demonstrate overview/dispatch's live-only / live-fallback
+    # behavior for a site with no precomputed runs yet.
+    create_resp2 = client.post("/api/sites", json=NEW_SITE_BODY)
+    site_id2 = create_resp2.json()["site_id"]
+
+    record(
+        "GET", "/api/sites/{site_id}/overview", f"/api/sites/{site_id2}/overview",
+        client.get(f"/api/sites/{site_id2}/overview"),
+        desc="A brand-new site: status=live_only (no precomputed runs yet)",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/dispatch", f"/api/sites/{site_id2}/dispatch?range=72",
+        client.get(f"/api/sites/{site_id2}/dispatch?range=72"),
+        desc="A brand-new site: falls back to a live solve for range<=72",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/dispatch", f"/api/sites/{site_id2}/dispatch?range=168",
+        client.get(f"/api/sites/{site_id2}/dispatch?range=168"),
+        desc="A brand-new site: range=168 refused rather than fabricated -> 404",
+    )
+
+    client.delete(f"/api/sites/{site_id2}")
+
+    record(
+        "GET", "/api/methodology", "/api/methodology",
+        client.get("/api/methodology"),
+        desc="DIYA's general data-provenance methodology (fixed, not site-specific)",
+    )
+
     return examples
 
 
@@ -297,6 +416,30 @@ def _render_schema_fields(schema_ref: dict, components: dict) -> list[str]:
     return lines
 
 
+def _is_step_like(item: Any) -> bool:
+    return isinstance(item, dict) and "t" in item and "reason_code" in item
+
+
+def _truncate_steps(payload: Any) -> Any:
+    """RunResult-shaped payloads (and anything embedding one, like
+    /evidence's four runs, /dispatch's steps array, or /export's bare JSON
+    steps list) carry up to 168 hourly steps -- truncate to the first 2 for
+    readability in the doc, noting the real total. Recurses into dict
+    values so nested RunResults (evidence's rule_based/mpc/diesel_only/
+    perfect_foresight) get the same treatment."""
+    if isinstance(payload, list) and len(payload) > 3 and all(_is_step_like(item) for item in payload):
+        return payload[:2] + [f"... ({len(payload)} steps total, truncated for this doc)"]
+    if isinstance(payload, dict):
+        out = dict(payload)
+        if "steps" in out and isinstance(out["steps"], list) and len(out["steps"]) > 3:
+            out["steps"] = out["steps"][:2] + [f"... ({len(out['steps'])} steps total, truncated for this doc)"]
+        for key, value in out.items():
+            if key != "steps" and isinstance(value, (dict, list)):
+                out[key] = _truncate_steps(value)
+        return out
+    return payload
+
+
 def _render_example(ex: Example) -> str:
     lines = [f"*{ex['description']}*" if ex["description"] else "", f"- Path: `{ex['path']}`"]
     if ex["request"] is not None:
@@ -305,18 +448,18 @@ def _render_example(ex: Example) -> str:
         lines.append(json.dumps(ex["request"], indent=2))
         lines.append("```")
     lines.append(f"- Response ({ex['status']}):")
-    lines.append("```json")
-    resp_json = ex["response"]
-    if isinstance(resp_json, dict) and "steps" in resp_json and isinstance(resp_json["steps"], list) and len(resp_json["steps"]) > 3:
-        # RunResult payloads carry up to 168 hourly steps -- truncate to the
-        # first 2 for readability, note the real total, keep everything else
-        # (kpi, provenance) in full so the schema is still fully visible.
-        truncated = dict(resp_json)
-        truncated["steps"] = resp_json["steps"][:2] + [f"... ({len(resp_json['steps'])} steps total, truncated for this doc)"]
-        lines.append(json.dumps(truncated, indent=2))
+    if ex.get("is_text"):
+        lines.append("```")
+        text = ex["response"] or ""
+        text_lines = text.splitlines()
+        if len(text_lines) > 5:
+            text = "\n".join(text_lines[:5] + [f"... ({len(text_lines)} lines total, truncated for this doc)"])
+        lines.append(text)
+        lines.append("```")
     else:
-        lines.append(json.dumps(resp_json, indent=2))
-    lines.append("```")
+        lines.append("```json")
+        lines.append(json.dumps(_truncate_steps(ex["response"]), indent=2))
+        lines.append("```")
     return "\n".join(line for line in lines if line != "")
 
 
@@ -400,6 +543,21 @@ def _render_markdown(schema: dict, examples: dict[tuple[str, str], list[Example]
         lines.append(_render_route(method, path, schema, examples.get((method, path), [])))
         lines.append("")
 
+    lines.append("## Convenience (Phase C.6, aggregates existing logic + geocoding)")
+    lines.append("")
+    lines.append(
+        "These add no new solver/physics/KPI logic. overview/dispatch/evidence/export "
+        "compose results already produced by the routes above (mainly _solve_live and "
+        "the precomputed run files) into frontend-friendly shapes; geocode is the one "
+        "genuinely new external call this phase adds (server-side OpenStreetMap Nominatim "
+        "lookups -- see core/geocode.py for why this must never be called directly from "
+        "browser JS)."
+    )
+    lines.append("")
+    for method, path in CONVENIENCE_ROUTES:
+        lines.append(_render_route(method, path, schema, examples.get((method, path), [])))
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -410,15 +568,15 @@ def main() -> None:
     OPENAPI_PATH.write_text(json.dumps(schema, indent=2), encoding="utf-8")
     print(f"wrote {OPENAPI_PATH}")
 
-    documented_paths = {(m, p) for m, p in LEGACY_ROUTES + SITE_SCOPED_ROUTES}
+    documented_paths = {(m, p) for m, p in LEGACY_ROUTES + SITE_SCOPED_ROUTES + CONVENIENCE_ROUTES}
     actual_paths = {
         (method.upper(), path) for path, methods in schema["paths"].items() for method in methods if method.upper() != "OPTIONS"
     }
     missing = actual_paths - documented_paths
     if missing:
         raise RuntimeError(
-            f"scripts/generate_api_contract.py's LEGACY_ROUTES/SITE_SCOPED_ROUTES lists are "
-            f"out of date -- these routes exist in the real app but have no doc entry: {sorted(missing)}"
+            f"scripts/generate_api_contract.py's LEGACY_ROUTES/SITE_SCOPED_ROUTES/CONVENIENCE_ROUTES "
+            f"lists are out of date -- these routes exist in the real app but have no doc entry: {sorted(missing)}"
         )
 
     print("capturing real examples via TestClient (this includes one real ~60-65s /api/resolve call)...")

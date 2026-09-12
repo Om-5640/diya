@@ -314,6 +314,47 @@ class SiteSummary(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Methodology (DIYA v2 Phase C.6) — general, site-independent data
+# provenance categorization for GET /api/methodology. This is the SAME
+# categorization already used in config/site_khavda.yaml's comment block,
+# restructured as data rather than duplicated: define it once, here, and
+# have the endpoint return this constant directly.
+# ---------------------------------------------------------------------------
+
+
+class MethodologyCategory(BaseModel):
+    label: str
+    items: list[str]
+
+
+class MethodologyNotes(BaseModel):
+    categories: list[MethodologyCategory]
+    load_note: str
+
+
+METHODOLOGY_NOTES = MethodologyNotes(
+    categories=[
+        MethodologyCategory(
+            label="Measured / Live",
+            items=["Historical and forecast weather (Open-Meteo)"],
+        ),
+        MethodologyCategory(
+            label="Public Reference",
+            items=["Diesel CO2 factor, PV/wind physics constants"],
+        ),
+        MethodologyCategory(
+            label="Engineering Assumption",
+            items=[
+                "Diesel price default, VOLL values, fuel curve coefficients, "
+                "load profile shape -- user-editable per site"
+            ],
+        ),
+    ],
+    load_note="Load is a synthetic, seeded model -- not metered telemetry.",
+)
+
+
+# ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
 

@@ -20,10 +20,14 @@ every response against the data contract in core/types.py.
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -31,10 +35,11 @@ if str(REPO_ROOT) not in sys.path:
 
 import pandas as pd  # noqa: E402
 import yaml  # noqa: E402
-from fastapi import FastAPI, HTTPException, Response  # noqa: E402
+from fastapi import FastAPI, HTTPException, Query, Response  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from core.geocode import GeocodeNotFoundError, GeocodeServiceError, geocode_forward, geocode_reverse  # noqa: E402
 from core.kpi import compute_kpi  # noqa: E402
 from core.load import generate_load  # noqa: E402
 from core.milp import solve_dispatch  # noqa: E402
@@ -47,6 +52,8 @@ from core.types import (  # noqa: E402
     DieselSpec,
     EconomicsSpec,
     LiveSolveRequest,
+    METHODOLOGY_NOTES,
+    MethodologyNotes,
     NewSiteRequest,
     Provenance,
     PVSpec,
@@ -248,6 +255,26 @@ def get_site_run(site_id: str, scenario_id: str, policy: str) -> RunResult:
     return _get_run(runs_dir, scenario_id, policy)
 
 
+def _scenario_summaries_for_site(site_id: str) -> list[ScenarioSummary]:
+    """Shared by GET /api/sites/{site_id}/scenarios and the Phase C.6
+    convenience endpoints (dispatch/evidence) that need to pick a default
+    scenario_id -- one source of truth for "what scenarios does this site
+    have," never duplicated."""
+    if site_id == KHAVDA_SITE_ID:
+        return [ScenarioSummary(scenario_id=sid, name=name) for sid, name in SCENARIO_NAMES.items()]
+    scenarios_dir = STORE.scenarios_dir_path(site_id)
+    ids = sorted(p.stem for p in scenarios_dir.glob("*.parquet")) if scenarios_dir.exists() else []
+    return [ScenarioSummary(scenario_id=sid, name=sid) for sid in ids]
+
+
+def _has_precomputed_runs(record: SiteRecord) -> bool:
+    """True if any run JSON exists under this site's runs_dir -- the single
+    signal both /overview's status field and /dispatch's/evidence's
+    precomputed-vs-live branching are based on."""
+    runs_dir = STORE.resolve_path(record.runs_dir)
+    return runs_dir.exists() and any(runs_dir.glob("*.json"))
+
+
 @app.get("/api/sites/{site_id}/scenarios", response_model=list[ScenarioSummary])
 def list_site_scenarios(site_id: str) -> list[ScenarioSummary]:
     """List the scenarios available for a site.
@@ -261,11 +288,7 @@ def list_site_scenarios(site_id: str) -> list[ScenarioSummary]:
     Errors: 404 if site_id is not registered.
     """
     _get_record_or_404(site_id)
-    if site_id == KHAVDA_SITE_ID:
-        return [ScenarioSummary(scenario_id=sid, name=name) for sid, name in SCENARIO_NAMES.items()]
-    scenarios_dir = STORE.scenarios_dir_path(site_id)
-    ids = sorted(p.stem for p in scenarios_dir.glob("*.parquet")) if scenarios_dir.exists() else []
-    return [ScenarioSummary(scenario_id=sid, name=sid) for sid in ids]
+    return _scenario_summaries_for_site(site_id)
 
 
 # ---------------------------------------------------------------------------
@@ -654,3 +677,337 @@ def resolve_for_site(site_id: str, req: ResolveRequest) -> RunResult:
     site = STORE.load_config(site_id)
     parquet_path = STORE.scenarios_dir_path(site_id) / f"{req.scenario_id}.parquet"
     return _resolve(req, site, parquet_path)
+
+
+# ---------------------------------------------------------------------------
+# Phase C.6 (DIYA v2): convenience endpoints. These add NO new solver,
+# physics, or KPI logic -- every one of them either (a) composes results
+# already produced by _solve_live/_get_run/SCENARIO_CFGS into a
+# frontend-friendly shape, or (b) is the one genuinely new external call
+# this phase adds: server-side geocoding via core/geocode.py.
+# ---------------------------------------------------------------------------
+
+
+class GeocodeRequest(BaseModel):
+    query: str
+
+
+class GeocodeResult(BaseModel):
+    lat: float
+    lon: float
+    display_name: str
+
+
+class GeocodeReverseRequest(BaseModel):
+    lat: float
+    lon: float
+
+
+class GeocodeReverseResult(BaseModel):
+    display_name: str
+
+
+# One process-lifetime cache per direction, per core/geocode.py's contract
+# (no TTL needed for a demo). Never cleared except by restarting the process.
+_GEOCODE_FORWARD_CACHE: dict[str, dict] = {}
+_GEOCODE_REVERSE_CACHE: dict[tuple[float, float], dict] = {}
+
+
+@app.post("/api/geocode", response_model=GeocodeResult)
+def geocode(req: GeocodeRequest) -> GeocodeResult:
+    """Forward geocode a free-text place name via OpenStreetMap Nominatim
+    (server-side only -- see core/geocode.py for why this must never be
+    called directly from browser JS).
+
+    Example request body: {"query": "Bhuj, Gujarat"}
+
+    Errors: 404 if Nominatim has no result for the query. 502 if Nominatim
+    itself is unreachable -- never fabricates a lat/lon in either case.
+    """
+    try:
+        result = geocode_forward(req.query, _GEOCODE_FORWARD_CACHE)
+    except GeocodeNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except GeocodeServiceError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return GeocodeResult(**result)
+
+
+@app.post("/api/geocode/reverse", response_model=GeocodeReverseResult)
+def geocode_reverse_route(req: GeocodeReverseRequest) -> GeocodeReverseResult:
+    """Reverse geocode a (lat, lon) pair into a human-readable place name via
+    OpenStreetMap Nominatim (server-side only, see core/geocode.py).
+
+    Example request body: {"lat": 23.2419, "lon": 69.6669}
+
+    Errors: 404 if Nominatim has no result for the coordinates. 502 if
+    Nominatim itself is unreachable -- never fabricates a display_name.
+    """
+    try:
+        result = geocode_reverse(req.lat, req.lon, _GEOCODE_REVERSE_CACHE)
+    except GeocodeNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except GeocodeServiceError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return GeocodeReverseResult(**result)
+
+
+class SiteOverview(BaseModel):
+    site: SiteSummary
+    current_step: StepResult
+    status: Literal["live_only", "full"]
+    has_precomputed_runs: bool
+
+
+@app.get("/api/sites/{site_id}/overview", response_model=SiteOverview)
+def site_overview(site_id: str) -> SiteOverview:
+    """One-call dashboard summary for a site: its registry summary, the
+    current hour's dispatch step (the first step of a fresh 72h live solve
+    -- the exact same _solve_live internal that POST /solve_live uses, not
+    a duplicate), and whether it has precomputed scenario runs yet.
+
+    `status` is exactly "live_only" (no precomputed runs -- the honest
+    description of a brand-new site; NOT "building_baseline", since no
+    background job producing one exists until Phase E) or "full".
+
+    Errors: 404 if site_id is not registered.
+    """
+    record = _get_record_or_404(site_id)
+    site = STORE.load_config(site_id)
+    live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
+    has_runs = _has_precomputed_runs(record)
+    return SiteOverview(
+        site=_to_summary(record),
+        current_step=live_result.steps[0],
+        status="full" if has_runs else "live_only",
+        has_precomputed_runs=has_runs,
+    )
+
+
+class DispatchResponse(BaseModel):
+    site_id: str
+    scenario_id: str
+    policy: str
+    range_hours: int
+    source: Literal["precomputed", "live"]
+    steps: list[StepResult]
+
+
+@app.get("/api/sites/{site_id}/dispatch", response_model=DispatchResponse)
+def site_dispatch(
+    site_id: str,
+    range_hours: int = Query(168, alias="range"),
+    scenario: str | None = None,
+    policy: str = "mpc",
+) -> DispatchResponse:
+    """Dispatch steps for charting, from whichever source this site
+    actually has: a precomputed run's steps (truncated to `range` hours from
+    the start) if any exist, otherwise a fresh live solve.
+
+    Example: GET /api/sites/khavda/dispatch?range=72
+
+    If precomputed runs exist: `scenario` defaults to the first one from
+    GET .../scenarios, `policy` defaults to "mpc".
+
+    If NO precomputed runs exist (a brand-new site): range<=72 falls back to
+    the same live solve /overview uses (always the full 72h it produces,
+    regardless of the exact range<=72 requested); range=168 is refused
+    rather than fabricated from a 72h live solve.
+
+    Errors: 404 if site_id is not registered, if no scenarios/runs are
+    available to satisfy a precomputed request, or if range=168 is
+    requested for a site with no precomputed runs ("Full week analysis
+    requires historical scenario data, not yet available for this site").
+    422 if range is anything other than 72 or 168.
+    """
+    if range_hours not in (72, 168):
+        raise HTTPException(status_code=422, detail="range must be 72 or 168")
+
+    record = _get_record_or_404(site_id)
+
+    if _has_precomputed_runs(record):
+        scenarios = _scenario_summaries_for_site(site_id)
+        scenario_id = scenario or (scenarios[0].scenario_id if scenarios else None)
+        if scenario_id is None:
+            raise HTTPException(status_code=404, detail=f"no scenarios available for site {site_id}")
+        runs_dir = STORE.resolve_path(record.runs_dir)
+        run = _get_run(runs_dir, scenario_id, policy)
+        steps = run.steps[:range_hours]
+        return DispatchResponse(
+            site_id=site_id, scenario_id=scenario_id, policy=policy,
+            range_hours=len(steps), source="precomputed", steps=steps,
+        )
+
+    if range_hours == 168:
+        raise HTTPException(
+            status_code=404,
+            detail="Full week analysis requires historical scenario data, not yet available for this site",
+        )
+
+    site = STORE.load_config(site_id)
+    live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
+    return DispatchResponse(
+        site_id=site_id, scenario_id="LIVE", policy="mpc",
+        range_hours=len(live_result.steps), source="live", steps=live_result.steps,
+    )
+
+
+class DeltaValue(BaseModel):
+    raw: float
+    avoided: float
+
+
+class EvidenceDelta(BaseModel):
+    diesel_l: DeltaValue
+    cost_total_inr: DeltaValue
+    co2_kg: DeltaValue
+    critical_outage_hours: DeltaValue
+    renewable_frac: DeltaValue
+    dg_starts: DeltaValue
+
+
+class EvidenceResponse(BaseModel):
+    site_id: str
+    scenario_id: str
+    description: str | None
+    rule_based: RunResult
+    mpc: RunResult
+    diesel_only: RunResult
+    perfect_foresight: RunResult
+    delta: EvidenceDelta
+
+
+_EVIDENCE_POLICIES = ("rule_based", "mpc", "diesel_only", "perfect_foresight")
+
+
+def _delta(rule_based_val: float, mpc_val: float) -> DeltaValue:
+    """rule_based-minus-mpc, uniformly, for every delta field. `avoided`
+    floors the raw value at 0 for "here's what mpc saved" display framing;
+    `raw` is always the true signed value, so a scenario where mpc did
+    WORSE than rule_based on some field shows up as a real negative, never
+    hidden by the floor."""
+    raw = rule_based_val - mpc_val
+    return DeltaValue(raw=raw, avoided=max(raw, 0.0))
+
+
+@app.get("/api/sites/{site_id}/evidence", response_model=EvidenceResponse)
+def site_evidence(site_id: str, scenario: str | None = None) -> EvidenceResponse:
+    """The four-policy comparison (rule_based / mpc / diesel_only /
+    perfect_foresight) for one scenario, plus a server-computed delta block
+    -- the frontend must never compute these deltas itself.
+
+    Example: GET /api/sites/khavda/evidence?scenario=S2
+
+    `scenario` defaults to the first available from GET .../scenarios.
+    `description` is read directly from config/scenarios.yaml (khavda only,
+    never duplicated/hardcoded elsewhere); null for sites with no
+    scenarios.yaml-equivalent yet -- never invented.
+
+    Errors: 404 if site_id is not registered, if it has no precomputed runs
+    at all, or if the chosen scenario is missing any of the 4 required
+    policy runs.
+    """
+    record = _get_record_or_404(site_id)
+    if not _has_precomputed_runs(record):
+        raise HTTPException(status_code=404, detail=f"site {site_id} has no precomputed scenario runs yet")
+
+    scenarios = _scenario_summaries_for_site(site_id)
+    scenario_id = scenario or (scenarios[0].scenario_id if scenarios else None)
+    if scenario_id is None:
+        raise HTTPException(status_code=404, detail=f"no scenarios available for site {site_id}")
+
+    runs_dir = STORE.resolve_path(record.runs_dir)
+    runs: dict[str, RunResult] = {}
+    for policy_name in _EVIDENCE_POLICIES:
+        path = runs_dir / f"{scenario_id}_{policy_name}.json"
+        if not path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"evidence for scenario {scenario_id!r} on site {site_id!r} requires all of "
+                    f"{_EVIDENCE_POLICIES}; missing {policy_name!r}"
+                ),
+            )
+        runs[policy_name] = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
+
+    rb, mpc_run = runs["rule_based"], runs["mpc"]
+    delta = EvidenceDelta(
+        diesel_l=_delta(rb.kpi.diesel_l, mpc_run.kpi.diesel_l),
+        cost_total_inr=_delta(rb.kpi.cost_total_inr, mpc_run.kpi.cost_total_inr),
+        co2_kg=_delta(rb.kpi.co2_kg, mpc_run.kpi.co2_kg),
+        critical_outage_hours=_delta(rb.kpi.critical_outage_hours, mpc_run.kpi.critical_outage_hours),
+        renewable_frac=_delta(rb.kpi.renewable_frac, mpc_run.kpi.renewable_frac),
+        dg_starts=_delta(rb.kpi.dg_starts, mpc_run.kpi.dg_starts),
+    )
+
+    description = SCENARIO_CFGS.get(scenario_id, {}).get("description")
+    if description is not None:
+        description = description.strip()
+
+    return EvidenceResponse(
+        site_id=site_id,
+        scenario_id=scenario_id,
+        description=description,
+        rule_based=rb,
+        mpc=mpc_run,
+        diesel_only=runs["diesel_only"],
+        perfect_foresight=runs["perfect_foresight"],
+        delta=delta,
+    )
+
+
+@app.get("/api/sites/{site_id}/export")
+def site_export(
+    site_id: str,
+    scenario: str,
+    policy: str,
+    export_format: Literal["csv", "json"] = Query("csv", alias="format"),
+) -> Response:
+    """Download one precomputed run's steps as a file: CSV (one row per
+    step, columns exactly matching StepResult's fields, in order) or JSON
+    (the raw steps array). Content-Disposition is set so a browser triggers
+    a save-as-file download rather than rendering the response inline.
+
+    Example: GET /api/sites/khavda/export?scenario=S2&policy=mpc&format=csv
+
+    Errors: 404 if site_id is not registered or the run doesn't exist.
+    """
+    record = _get_record_or_404(site_id)
+    runs_dir = STORE.resolve_path(record.runs_dir)
+    run = _get_run(runs_dir, scenario, policy)
+
+    filename_base = f"{site_id}_{scenario}_{policy}"
+    if export_format == "json":
+        content = json.dumps([step.model_dump() for step in run.steps], indent=2)
+        media_type = "application/json"
+        filename = f"{filename_base}.json"
+    else:
+        buf = io.StringIO()
+        fieldnames = list(StepResult.model_fields.keys())
+        writer = csv.DictWriter(buf, fieldnames=fieldnames)
+        writer.writeheader()
+        for step in run.steps:
+            writer.writerow(step.model_dump())
+        content = buf.getvalue()
+        media_type = "text/csv"
+        filename = f"{filename_base}.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/methodology", response_model=MethodologyNotes)
+def methodology() -> MethodologyNotes:
+    """DIYA's general (not site-specific) data-provenance methodology:
+    which numbers are measured/live, which are public-reference constants,
+    and which are engineering-assumption placeholders -- the same
+    categorization already documented in config/site_khavda.yaml's comment
+    block, returned as structured data from ONE source of truth
+    (core/types.py::METHODOLOGY_NOTES) instead of being duplicated here.
+
+    Fixed, deterministic response -- no error cases.
+    """
+    return METHODOLOGY_NOTES
