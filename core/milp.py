@@ -156,11 +156,27 @@ def solve_dispatch(
 
     prob = pulp.LpProblem("diya_dispatch", pulp.LpMinimize)
 
+    # A site with no diesel genset (rated_kw <= 0, e.g. a new renewables+
+    # battery-only site created via /api/sites) must never be modeled as a
+    # free binary that the solver happens to leave at 0 -- that's degenerate
+    # and, worse, gives the solver no reason to prefer 0 over 1 whenever
+    # rated_kw is 0 (any u_dg/p_dg combination costs the same nothing). Fix
+    # these variables to 0 via bounds instead, so there is no diesel binary
+    # for the solver to branch on at all. C6/C7 below still add their normal
+    # constraints against these fixed-at-0 variables; they just become
+    # trivially satisfied rather than doing the fixing themselves.
+    diesel_disabled = diesel.rated_kw <= 0
+
     pv_use = [pulp.LpVariable(f"pv_use_{t}", lowBound=0) for t in range(H)]
     wind_use = [pulp.LpVariable(f"wind_use_{t}", lowBound=0) for t in range(H)]
-    p_dg = [pulp.LpVariable(f"p_dg_{t}", lowBound=0) for t in range(H)]
-    u_dg = [pulp.LpVariable(f"u_dg_{t}", cat="Binary") for t in range(H)]
-    y_start = [pulp.LpVariable(f"y_start_{t}", cat="Binary") for t in range(H)]
+    if diesel_disabled:
+        p_dg = [pulp.LpVariable(f"p_dg_{t}", lowBound=0, upBound=0) for t in range(H)]
+        u_dg = [pulp.LpVariable(f"u_dg_{t}", lowBound=0, upBound=0, cat="Integer") for t in range(H)]
+        y_start = [pulp.LpVariable(f"y_start_{t}", lowBound=0, upBound=0, cat="Integer") for t in range(H)]
+    else:
+        p_dg = [pulp.LpVariable(f"p_dg_{t}", lowBound=0) for t in range(H)]
+        u_dg = [pulp.LpVariable(f"u_dg_{t}", cat="Binary") for t in range(H)]
+        y_start = [pulp.LpVariable(f"y_start_{t}", cat="Binary") for t in range(H)]
     p_ch = [pulp.LpVariable(f"p_ch_{t}", lowBound=0) for t in range(H)]
     p_dis = [pulp.LpVariable(f"p_dis_{t}", lowBound=0) for t in range(H)]
     soc = [pulp.LpVariable(f"soc_{t}", lowBound=0) for t in range(H)]

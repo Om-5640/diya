@@ -203,6 +203,52 @@ def _toy_d() -> dict:
     )
 
 
+def _toy_e_diesel_disabled() -> dict:
+    """Diesel-optional site (rated_kw=0, Phase C): insufficient renewables +
+    battery leaves a genuine shortfall. u_dg/p_dg/y_start must be fixed at 0
+    via variable bounds (core/milp.py), not left as a free binary the solver
+    happens to zero out -- see core/milp.py's diesel_disabled comment."""
+    battery = _battery(
+        capacity_kwh=10.0,
+        soc_min_pct=10.0,
+        soc_max_pct=95.0,
+        p_charge_max_kw=5.0,
+        p_discharge_max_kw=5.0,
+        eta_charge=1.0,
+        eta_discharge=1.0,
+        soc_init_pct=20.0,
+    )
+    H = 3
+    return dict(
+        pv=[2.0] * H,
+        wind=[0.0] * H,
+        critical=[10.0] * H,
+        essential=[0.0] * H,
+        deferrable=[0.0] * H,
+        battery=battery,
+        diesel=_diesel(rated_kw=0.0, min_load_frac=0.3),
+        economics=_economics(),
+        soc_init_kwh=1.0,
+        dg_on_prev=False,
+    )
+
+
+def test_toy_e_diesel_disabled_honest_shortfall_no_fuel_or_starts():
+    args = _toy_e_diesel_disabled()
+    plan = _solve(args)
+
+    assert plan.solve_status == "Optimal"
+    assert plan.dg_on == [0, 0, 0]
+    assert plan.dg_kw == pytest.approx([0.0, 0.0, 0.0], abs=1e-9)
+    assert plan.dg_start == [0, 0, 0]
+    assert sum(plan.fuel_l) == pytest.approx(0.0, abs=1e-9)
+    assert all(s > 0 for s in plan.unserved_critical_kwh)
+
+    econ = args["economics"]
+    expected_obj = sum(econ.voll_critical_inr_per_kwh * s for s in plan.unserved_critical_kwh)
+    assert plan.objective_value == pytest.approx(expected_obj, rel=1e-6)
+
+
 def _random_24h_instance(seed: int = 123) -> dict:
     """Seeded, all-four-assets-active 24h instance for invariant checks
     (no hand-verified exact values — just structural consistency)."""
@@ -316,6 +362,7 @@ INSTANCES = {
     "toy_b": _toy_b,
     "toy_c": _toy_c,
     "toy_d": _toy_d,
+    "toy_e_diesel_disabled": _toy_e_diesel_disabled,
     "random_24h": _random_24h_instance,
 }
 

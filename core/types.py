@@ -266,6 +266,54 @@ class ResolveRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Multi-site store models (Phase C of DIYA v2)
+# ---------------------------------------------------------------------------
+
+
+class SiteRecord(BaseModel):
+    """One entry in sites/registry.json. Points at a SiteConfig YAML plus its
+    scenarios/runs directories -- does not embed the config itself."""
+
+    site_id: str
+    display_name: str
+    lat: float
+    lon: float
+    config_path: str
+    scenarios_dir: str
+    runs_dir: str
+    created_at: str  # ISO 8601
+    is_seed: bool = False
+
+
+class NewSiteRequest(BaseModel):
+    """Body for POST /api/sites. Minimal input; SiteStore.create derives a
+    full SiteConfig (PV tilt/azimuth by hemisphere, battery/diesel/economics
+    defaults, etc.) from these fields -- see core/site_store.py."""
+
+    display_name: str
+    lat: float
+    lon: float
+    elevation_m: float = 0.0
+    timezone: str = "Asia/Kolkata"
+    pv_capacity_kwp: float
+    battery_capacity_kwh: float
+    diesel_rated_kw: float = 0.0
+    outage_cost_inr_per_kwh: float = 500.0
+    diesel_price_inr_per_l: float = 92.5
+
+
+class SiteSummary(BaseModel):
+    """Response shape for GET /api/sites and GET /api/sites/{site_id}."""
+
+    site_id: str
+    display_name: str
+    lat: float
+    lon: float
+    created_at: str
+    is_seed: bool
+
+
+# ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
 

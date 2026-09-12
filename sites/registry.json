@@ -1,0 +1,13 @@
+[
+  {
+    "site_id": "khavda",
+    "display_name": "Khavda Off-Grid Microgrid",
+    "lat": 23.8443,
+    "lon": 69.7317,
+    "config_path": "config/site_khavda.yaml",
+    "scenarios_dir": "data/processed",
+    "runs_dir": "data/processed/runs",
+    "created_at": "2026-01-01T00:00:00+00:00",
+    "is_seed": true
+  }
+]
