@@ -43,15 +43,20 @@ from core.pv import pv_power_kw  # noqa: E402
 from core.reasons import reason_for_planned_step  # noqa: E402
 from core.site_store import KHAVDA_SITE_ID, SeedSiteProtectedError, SiteNotFoundError, SiteStore  # noqa: E402
 from core.types import (  # noqa: E402
+    BatterySpec,
+    DieselSpec,
+    EconomicsSpec,
     LiveSolveRequest,
     NewSiteRequest,
     Provenance,
+    PVSpec,
     ResolveRequest,
     RunResult,
     SiteConfig,
     SiteRecord,
     SiteSummary,
     StepResult,
+    WindSpec,
     config_hash,
 )
 from core.weather import fetch_forecast_live, load_cached_forecast  # noqa: E402
@@ -85,6 +90,13 @@ SCENARIO_CFGS = _load_scenario_cfgs()
 
 app = FastAPI(title="DIYA API", version="0.1.0-phase4")
 
+# KNOWN, TEMPORARY CHOICE (DIYA v2 Phase C.5): allow_origins=["*"] is wide
+# open so an external frontend build (Lovable) can point at this API from
+# whatever dynamic preview domain it gets assigned, without us having to
+# predict/whitelist it in advance. Open CORS plus NO rate limiting is a
+# bigger exposure than open CORS alone -- Phase G (rate limiting) is what
+# actually closes this gap, not this phase. Revisit allow_origins once
+# Phase G lands (e.g. pin to the real deployed frontend origin(s)).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -100,6 +112,48 @@ class RunListEntry(BaseModel):
     name: str
 
 
+class ScenarioSummary(BaseModel):
+    scenario_id: str
+    name: str
+
+
+class HealthResponse(BaseModel):
+    ok: bool
+    phase: int
+
+
+class ServiceInfo(BaseModel):
+    service: str
+    docs: str
+    openapi: str
+    health: str
+
+
+class SiteUpdateRequest(BaseModel):
+    """Partial update body for PATCH /api/sites/{site_id}. Every field is
+    optional; only fields actually present in the request are applied
+    (pydantic's exclude_unset, not "set to None") -- this preserves the
+    original dict-based partial-update semantics of SiteStore.update while
+    giving the field a real, documented type instead of an opaque object.
+    On a seed site (khavda), only economics/horizon_hours/reserve_hours/
+    k_uncertainty may be present; any other field raises 400.
+    """
+
+    name: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    elevation_m: float | None = None
+    timezone: str | None = None
+    pv: PVSpec | None = None
+    wind: WindSpec | None = None
+    battery: BatterySpec | None = None
+    diesel: DieselSpec | None = None
+    economics: EconomicsSpec | None = None
+    horizon_hours: int | None = None
+    reserve_hours: int | None = None
+    k_uncertainty: float | None = None
+
+
 def _get_record_or_404(site_id: str) -> SiteRecord:
     try:
         return STORE.get(site_id)
@@ -107,9 +161,19 @@ def _get_record_or_404(site_id: str) -> SiteRecord:
         raise HTTPException(status_code=404, detail=f"unknown site_id: {site_id}")
 
 
-@app.get("/api/health")
-def health() -> dict:
-    return {"ok": True, "phase": 4}
+@app.get("/", response_model=ServiceInfo)
+def root() -> ServiceInfo:
+    """Service pointer. Not part of the dispatch API itself -- just tells a
+    caller landing on the bare host where to find the interactive docs, the
+    raw OpenAPI schema, and the health check."""
+    return ServiceInfo(service="DIYA API", docs="/docs", openapi="/openapi.json", health="/api/health")
+
+
+@app.get("/api/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    """Liveness check. Always returns 200 with ok=true if the process is up
+    and able to handle requests; no error cases."""
+    return HealthResponse(ok=True, phase=4)
 
 
 # ---------------------------------------------------------------------------
@@ -135,16 +199,35 @@ def _get_run(runs_dir: Path, scenario_id: str, policy: str) -> RunResult:
 
 @app.get("/api/runs", response_model=list[RunListEntry])
 def list_runs() -> list[RunListEntry]:
+    """List every precomputed dispatch run for Khavda (legacy, khavda-only).
+
+    Returns one entry per (scenario_id, policy) pair found under
+    data/processed/runs/. No error cases -- an empty list if none exist.
+    """
     return _list_runs(RUNS_DIR, SCENARIO_NAMES)
 
 
 @app.get("/api/runs/{scenario_id}/{policy}", response_model=RunResult)
 def get_run(scenario_id: str, policy: str) -> RunResult:
+    """Fetch one precomputed dispatch run for Khavda (legacy, khavda-only).
+
+    Example: GET /api/runs/S2/mpc
+
+    Errors: 404 if no precomputed run exists for that scenario_id/policy pair.
+    """
     return _get_run(RUNS_DIR, scenario_id, policy)
 
 
 @app.get("/api/sites/{site_id}/runs", response_model=list[RunListEntry])
 def list_site_runs(site_id: str) -> list[RunListEntry]:
+    """List every precomputed dispatch run for any registered site.
+
+    Same shape as legacy GET /api/runs, generalized to site_id. A site with
+    no precomputed runs yet (e.g. one just created via POST /api/sites)
+    returns an empty list, not an error.
+
+    Errors: 404 if site_id is not registered.
+    """
     record = _get_record_or_404(site_id)
     runs_dir = STORE.resolve_path(record.runs_dir)
     names = SCENARIO_NAMES if site_id == KHAVDA_SITE_ID else {}
@@ -153,19 +236,36 @@ def list_site_runs(site_id: str) -> list[RunListEntry]:
 
 @app.get("/api/sites/{site_id}/runs/{scenario_id}/{policy}", response_model=RunResult)
 def get_site_run(site_id: str, scenario_id: str, policy: str) -> RunResult:
+    """Fetch one precomputed dispatch run for any registered site.
+
+    Example: GET /api/sites/khavda/runs/S2/mpc
+
+    Errors: 404 if site_id is not registered, or if no precomputed run
+    exists for that scenario_id/policy pair on this site.
+    """
     record = _get_record_or_404(site_id)
     runs_dir = STORE.resolve_path(record.runs_dir)
     return _get_run(runs_dir, scenario_id, policy)
 
 
-@app.get("/api/sites/{site_id}/scenarios")
-def list_site_scenarios(site_id: str) -> list[dict]:
+@app.get("/api/sites/{site_id}/scenarios", response_model=list[ScenarioSummary])
+def list_site_scenarios(site_id: str) -> list[ScenarioSummary]:
+    """List the scenarios available for a site.
+
+    For khavda, returns the human-named S1/S2/S3 scenarios defined in
+    config/scenarios.yaml. For any other site, returns one entry per
+    scenario parquet file found under that site's own scenarios directory
+    (id and name are the same string, since new sites have no separate
+    human-naming step yet) -- an empty list if none have been uploaded.
+
+    Errors: 404 if site_id is not registered.
+    """
     _get_record_or_404(site_id)
     if site_id == KHAVDA_SITE_ID:
-        return [{"scenario_id": sid, "name": name} for sid, name in SCENARIO_NAMES.items()]
+        return [ScenarioSummary(scenario_id=sid, name=name) for sid, name in SCENARIO_NAMES.items()]
     scenarios_dir = STORE.scenarios_dir_path(site_id)
     ids = sorted(p.stem for p in scenarios_dir.glob("*.parquet")) if scenarios_dir.exists() else []
-    return [{"scenario_id": sid, "name": sid} for sid in ids]
+    return [ScenarioSummary(scenario_id=sid, name=sid) for sid in ids]
 
 
 # ---------------------------------------------------------------------------
@@ -186,23 +286,59 @@ def _to_summary(record: SiteRecord) -> SiteSummary:
 
 @app.get("/api/sites", response_model=list[SiteSummary])
 def list_sites() -> list[SiteSummary]:
+    """List every registered site (always includes the khavda seed site).
+
+    No error cases.
+    """
     return [_to_summary(r) for r in STORE.list()]
 
 
 @app.post("/api/sites", response_model=SiteSummary, status_code=201)
 def create_site(req: NewSiteRequest) -> SiteSummary:
+    """Register a new site, deriving a full SiteConfig from minimal input.
+
+    Example request body:
+        {"display_name": "Example Site", "lat": -33.9, "lon": 18.4,
+         "pv_capacity_kwp": 10.0, "battery_capacity_kwh": 30.0}
+
+    PV tilt/azimuth are derived from lat (tilt = abs(lat), array facing the
+    equator); wind is omitted (rated_kw=0); battery is sized at a 3-hour
+    C-rate; diesel reuses Khavda's combustion-property constants at the
+    given (or default) rated_kw; VOLL values are ratios of
+    outage_cost_inr_per_kwh. See core/site_store.py for the exact defaults.
+
+    No error cases beyond standard 422 body validation.
+    """
     record = STORE.create(req)
     return _to_summary(record)
 
 
 @app.get("/api/sites/{site_id}", response_model=SiteSummary)
 def get_site(site_id: str) -> SiteSummary:
+    """Fetch one registered site's summary.
+
+    Errors: 404 if site_id is not registered.
+    """
     return _to_summary(_get_record_or_404(site_id))
 
 
 @app.patch("/api/sites/{site_id}", response_model=SiteSummary)
-def patch_site(site_id: str, updates: dict) -> SiteSummary:
+def patch_site(site_id: str, req: SiteUpdateRequest) -> SiteSummary:
+    """Partially update a site's SiteConfig. Only fields present in the
+    request body are changed; omitted fields are left as-is.
+
+    Example request body: {"economics": {"diesel_price_inr_per_l": 100.0,
+    "diesel_price_source": "manual override", "co2_price_inr_per_kg": 2.0,
+    "voll_critical_inr_per_kwh": 500.0, "voll_essential_inr_per_kwh": 60.0,
+    "voll_deferrable_inr_per_kwh": 12.0}}
+
+    Errors: 404 if site_id is not registered. 400 if site_id is a seed site
+    (khavda) and the request touches any field other than economics,
+    horizon_hours, reserve_hours, or k_uncertainty -- Khavda's real hardware
+    configuration must not be silently rewritten by an API call.
+    """
     _get_record_or_404(site_id)
+    updates = req.model_dump(exclude_unset=True)
     try:
         STORE.update(site_id, updates)
     except SeedSiteProtectedError as e:
@@ -212,6 +348,12 @@ def patch_site(site_id: str, updates: dict) -> SiteSummary:
 
 @app.delete("/api/sites/{site_id}", status_code=204)
 def delete_site(site_id: str) -> Response:
+    """Permanently delete a site: removes its registry entry and its own
+    config/scenarios/runs directory (sites/{site_id}/).
+
+    Errors: 404 if site_id is not registered. 400/403 if site_id is a seed
+    site (khavda) -- seed sites can never be deleted through this API.
+    """
     _get_record_or_404(site_id)
     try:
         STORE.delete(site_id)
@@ -373,12 +515,28 @@ def _solve_live(req: LiveSolveRequest, site: SiteConfig) -> RunResult:
 
 @app.post("/api/solve_live", response_model=RunResult)
 def solve_live(req: LiveSolveRequest) -> RunResult:
+    """One-shot 72-hour forecast-driven dispatch plan for Khavda, using
+    real live weather for (lat, lon) where possible (legacy, khavda-only).
+
+    Example request body: {"lat": 23.8443, "lon": 69.7317, "soc_pct": 60.0}
+
+    Weather falls back live-fetch -> last cached forecast -> scenario replay
+    if the network is unavailable; provenance.forecast_method in the
+    response says which was actually used. No error cases -- this endpoint
+    never raises on a weather-fetch failure, only on malformed input (422).
+    """
     site = STORE.load_config(KHAVDA_SITE_ID)
     return _solve_live(req, site)
 
 
 @app.post("/api/sites/{site_id}/solve_live", response_model=RunResult)
 def solve_live_for_site(site_id: str, req: LiveSolveRequest) -> RunResult:
+    """Same as legacy POST /api/solve_live, generalized to any registered
+    site's own hardware/economics configuration.
+
+    Errors: 404 if site_id is not registered; otherwise same as legacy
+    /api/solve_live (never raises on a weather-fetch failure).
+    """
     _get_record_or_404(site_id)
     site = STORE.load_config(site_id)
     return _solve_live(req, site)
@@ -461,6 +619,20 @@ def _resolve(req: ResolveRequest, site: SiteConfig, parquet_path: Path) -> RunRe
 
 @app.post("/api/resolve", response_model=RunResult)
 def resolve(req: ResolveRequest) -> RunResult:
+    """Re-solve a full Khavda scenario (S1/S2/S3) via rolling MPC with
+    user-adjusted cost/CO2/reliability weights, k_uncertainty, and diesel
+    price (legacy, khavda-only).
+
+    Example request body: {"scenario_id": "S1", "weights": {"cost": 1.0,
+    "co2": 1.0, "reliability": 1.0}, "k_uncertainty": 1.0,
+    "diesel_price_inr_per_l": 92.5}
+
+    SLOW: ~60-65s (168 sequential 24h MILP solves) -- see the comment block
+    above this route for why, and FREEZE_NOTES.md for the accepted timing.
+
+    Errors: 404 if scenario_id is not one of the configured scenarios, or if
+    that scenario has no parquet data on disk.
+    """
     if req.scenario_id not in SCENARIO_CFGS:
         raise HTTPException(status_code=404, detail=f"unknown scenario_id: {req.scenario_id}")
     site = STORE.load_config(KHAVDA_SITE_ID)
@@ -470,6 +642,14 @@ def resolve(req: ResolveRequest) -> RunResult:
 
 @app.post("/api/sites/{site_id}/resolve", response_model=RunResult)
 def resolve_for_site(site_id: str, req: ResolveRequest) -> RunResult:
+    """Same as legacy POST /api/resolve, generalized to any registered
+    site's own scenario data (looked up as
+    <that site's scenarios_dir>/{scenario_id}.parquet).
+
+    Errors: 404 if site_id is not registered, or if that site has no
+    parquet data for the given scenario_id (e.g. a newly created site with
+    no scenarios uploaded yet).
+    """
     _get_record_or_404(site_id)
     site = STORE.load_config(site_id)
     parquet_path = STORE.scenarios_dir_path(site_id) / f"{req.scenario_id}.parquet"

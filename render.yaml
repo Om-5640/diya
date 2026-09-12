@@ -1,0 +1,23 @@
+# DIYA render.yaml — Render Blueprint for the FastAPI backend (DIYA v2
+# Phase C.5). Connect this GitHub repo on Render as a Blueprint and it reads
+# this file automatically -- see DEPLOYMENT.md for the exact click-through
+# steps and what to verify afterward.
+#
+# Python 3.13 is pinned to match this repo's own dev environment (see
+# requirements.txt's note on numpy/pyarrow needing cp313 wheels). highspy
+# 1.15.x (Phase B's in-process HiGHS solver) publishes manylinux x86_64
+# wheels for cp313, so `pip install -r requirements.txt` does not need to
+# compile anything from source on Render's build image.
+services:
+  - type: web
+    name: diya-api
+    runtime: python
+    plan: free
+    region: oregon
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4

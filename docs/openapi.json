@@ -1,0 +1,1563 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DIYA API",
+    "version": "0.1.0-phase4"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Service pointer. Not part of the dispatch API itself -- just tells a\ncaller landing on the bare host where to find the interactive docs, the\nraw OpenAPI schema, and the health check.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Liveness check. Always returns 200 with ok=true if the process is up\nand able to handle requests; no error cases.",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "summary": "List Runs",
+        "description": "List every precomputed dispatch run for Khavda (legacy, khavda-only).\n\nReturns one entry per (scenario_id, policy) pair found under\ndata/processed/runs/. No error cases -- an empty list if none exist.",
+        "operationId": "list_runs_api_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunListEntry"
+                  },
+                  "type": "array",
+                  "title": "Response List Runs Api Runs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{scenario_id}/{policy}": {
+      "get": {
+        "summary": "Get Run",
+        "description": "Fetch one precomputed dispatch run for Khavda (legacy, khavda-only).\n\nExample: GET /api/runs/S2/mpc\n\nErrors: 404 if no precomputed run exists for that scenario_id/policy pair.",
+        "operationId": "get_run_api_runs__scenario_id___policy__get",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "policy",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Policy"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/runs": {
+      "get": {
+        "summary": "List Site Runs",
+        "description": "List every precomputed dispatch run for any registered site.\n\nSame shape as legacy GET /api/runs, generalized to site_id. A site with\nno precomputed runs yet (e.g. one just created via POST /api/sites)\nreturns an empty list, not an error.\n\nErrors: 404 if site_id is not registered.",
+        "operationId": "list_site_runs_api_sites__site_id__runs_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RunListEntry"
+                  },
+                  "title": "Response List Site Runs Api Sites  Site Id  Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/runs/{scenario_id}/{policy}": {
+      "get": {
+        "summary": "Get Site Run",
+        "description": "Fetch one precomputed dispatch run for any registered site.\n\nExample: GET /api/sites/khavda/runs/S2/mpc\n\nErrors: 404 if site_id is not registered, or if no precomputed run\nexists for that scenario_id/policy pair on this site.",
+        "operationId": "get_site_run_api_sites__site_id__runs__scenario_id___policy__get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "policy",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Policy"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/scenarios": {
+      "get": {
+        "summary": "List Site Scenarios",
+        "description": "List the scenarios available for a site.\n\nFor khavda, returns the human-named S1/S2/S3 scenarios defined in\nconfig/scenarios.yaml. For any other site, returns one entry per\nscenario parquet file found under that site's own scenarios directory\n(id and name are the same string, since new sites have no separate\nhuman-naming step yet) -- an empty list if none have been uploaded.\n\nErrors: 404 if site_id is not registered.",
+        "operationId": "list_site_scenarios_api_sites__site_id__scenarios_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScenarioSummary"
+                  },
+                  "title": "Response List Site Scenarios Api Sites  Site Id  Scenarios Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites": {
+      "get": {
+        "summary": "List Sites",
+        "description": "List every registered site (always includes the khavda seed site).\n\nNo error cases.",
+        "operationId": "list_sites_api_sites_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SiteSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Sites Api Sites Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Site",
+        "description": "Register a new site, deriving a full SiteConfig from minimal input.\n\nExample request body:\n    {\"display_name\": \"Example Site\", \"lat\": -33.9, \"lon\": 18.4,\n     \"pv_capacity_kwp\": 10.0, \"battery_capacity_kwh\": 30.0}\n\nPV tilt/azimuth are derived from lat (tilt = abs(lat), array facing the\nequator); wind is omitted (rated_kw=0); battery is sized at a 3-hour\nC-rate; diesel reuses Khavda's combustion-property constants at the\ngiven (or default) rated_kw; VOLL values are ratios of\noutage_cost_inr_per_kwh. See core/site_store.py for the exact defaults.\n\nNo error cases beyond standard 422 body validation.",
+        "operationId": "create_site_api_sites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}": {
+      "get": {
+        "summary": "Get Site",
+        "description": "Fetch one registered site's summary.\n\nErrors: 404 if site_id is not registered.",
+        "operationId": "get_site_api_sites__site_id__get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch Site",
+        "description": "Partially update a site's SiteConfig. Only fields present in the\nrequest body are changed; omitted fields are left as-is.\n\nExample request body: {\"economics\": {\"diesel_price_inr_per_l\": 100.0,\n\"diesel_price_source\": \"manual override\", \"co2_price_inr_per_kg\": 2.0,\n\"voll_critical_inr_per_kwh\": 500.0, \"voll_essential_inr_per_kwh\": 60.0,\n\"voll_deferrable_inr_per_kwh\": 12.0}}\n\nErrors: 404 if site_id is not registered. 400 if site_id is a seed site\n(khavda) and the request touches any field other than economics,\nhorizon_hours, reserve_hours, or k_uncertainty -- Khavda's real hardware\nconfiguration must not be silently rewritten by an API call.",
+        "operationId": "patch_site_api_sites__site_id__patch",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Site",
+        "description": "Permanently delete a site: removes its registry entry and its own\nconfig/scenarios/runs directory (sites/{site_id}/).\n\nErrors: 404 if site_id is not registered. 400/403 if site_id is a seed\nsite (khavda) -- seed sites can never be deleted through this API.",
+        "operationId": "delete_site_api_sites__site_id__delete",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solve_live": {
+      "post": {
+        "summary": "Solve Live",
+        "description": "One-shot 72-hour forecast-driven dispatch plan for Khavda, using\nreal live weather for (lat, lon) where possible (legacy, khavda-only).\n\nExample request body: {\"lat\": 23.8443, \"lon\": 69.7317, \"soc_pct\": 60.0}\n\nWeather falls back live-fetch -> last cached forecast -> scenario replay\nif the network is unavailable; provenance.forecast_method in the\nresponse says which was actually used. No error cases -- this endpoint\nnever raises on a weather-fetch failure, only on malformed input (422).",
+        "operationId": "solve_live_api_solve_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveSolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/solve_live": {
+      "post": {
+        "summary": "Solve Live For Site",
+        "description": "Same as legacy POST /api/solve_live, generalized to any registered\nsite's own hardware/economics configuration.\n\nErrors: 404 if site_id is not registered; otherwise same as legacy\n/api/solve_live (never raises on a weather-fetch failure).",
+        "operationId": "solve_live_for_site_api_sites__site_id__solve_live_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveSolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resolve": {
+      "post": {
+        "summary": "Resolve",
+        "description": "Re-solve a full Khavda scenario (S1/S2/S3) via rolling MPC with\nuser-adjusted cost/CO2/reliability weights, k_uncertainty, and diesel\nprice (legacy, khavda-only).\n\nExample request body: {\"scenario_id\": \"S1\", \"weights\": {\"cost\": 1.0,\n\"co2\": 1.0, \"reliability\": 1.0}, \"k_uncertainty\": 1.0,\n\"diesel_price_inr_per_l\": 92.5}\n\nSLOW: ~60-65s (168 sequential 24h MILP solves) -- see the comment block\nabove this route for why, and FREEZE_NOTES.md for the accepted timing.\n\nErrors: 404 if scenario_id is not one of the configured scenarios, or if\nthat scenario has no parquet data on disk.",
+        "operationId": "resolve_api_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/resolve": {
+      "post": {
+        "summary": "Resolve For Site",
+        "description": "Same as legacy POST /api/resolve, generalized to any registered\nsite's own scenario data (looked up as\n<that site's scenarios_dir>/{scenario_id}.parquet).\n\nErrors: 404 if site_id is not registered, or if that site has no\nparquet data for the given scenario_id (e.g. a newly created site with\nno scenarios uploaded yet).",
+        "operationId": "resolve_for_site_api_sites__site_id__resolve_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BatterySpec": {
+        "properties": {
+          "capacity_kwh": {
+            "type": "number",
+            "title": "Capacity Kwh"
+          },
+          "soc_min_pct": {
+            "type": "number",
+            "title": "Soc Min Pct"
+          },
+          "soc_max_pct": {
+            "type": "number",
+            "title": "Soc Max Pct"
+          },
+          "p_charge_max_kw": {
+            "type": "number",
+            "title": "P Charge Max Kw"
+          },
+          "p_discharge_max_kw": {
+            "type": "number",
+            "title": "P Discharge Max Kw"
+          },
+          "eta_charge": {
+            "type": "number",
+            "title": "Eta Charge"
+          },
+          "eta_discharge": {
+            "type": "number",
+            "title": "Eta Discharge"
+          },
+          "soc_init_pct": {
+            "type": "number",
+            "title": "Soc Init Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capacity_kwh",
+          "soc_min_pct",
+          "soc_max_pct",
+          "p_charge_max_kw",
+          "p_discharge_max_kw",
+          "eta_charge",
+          "eta_discharge",
+          "soc_init_pct"
+        ],
+        "title": "BatterySpec",
+        "description": "Battery energy storage spec. Power in kW, energy in kWh, dt = 1h."
+      },
+      "DieselSpec": {
+        "properties": {
+          "rated_kw": {
+            "type": "number",
+            "title": "Rated Kw"
+          },
+          "min_load_frac": {
+            "type": "number",
+            "title": "Min Load Frac"
+          },
+          "fuel_a_l_per_kw_h": {
+            "type": "number",
+            "title": "Fuel A L Per Kw H"
+          },
+          "fuel_b_l_per_kwh": {
+            "type": "number",
+            "title": "Fuel B L Per Kwh"
+          },
+          "start_cost_inr": {
+            "type": "number",
+            "title": "Start Cost Inr"
+          },
+          "co2_kg_per_l": {
+            "type": "number",
+            "title": "Co2 Kg Per L"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rated_kw",
+          "min_load_frac",
+          "fuel_a_l_per_kw_h",
+          "fuel_b_l_per_kwh",
+          "start_cost_inr",
+          "co2_kg_per_l"
+        ],
+        "title": "DieselSpec",
+        "description": "Diesel genset spec. Power in kW, fuel in L, dt = 1h."
+      },
+      "EconomicsSpec": {
+        "properties": {
+          "diesel_price_inr_per_l": {
+            "type": "number",
+            "title": "Diesel Price Inr Per L"
+          },
+          "diesel_price_source": {
+            "type": "string",
+            "title": "Diesel Price Source"
+          },
+          "co2_price_inr_per_kg": {
+            "type": "number",
+            "title": "Co2 Price Inr Per Kg"
+          },
+          "voll_critical_inr_per_kwh": {
+            "type": "number",
+            "title": "Voll Critical Inr Per Kwh"
+          },
+          "voll_essential_inr_per_kwh": {
+            "type": "number",
+            "title": "Voll Essential Inr Per Kwh"
+          },
+          "voll_deferrable_inr_per_kwh": {
+            "type": "number",
+            "title": "Voll Deferrable Inr Per Kwh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diesel_price_inr_per_l",
+          "diesel_price_source",
+          "co2_price_inr_per_kg",
+          "voll_critical_inr_per_kwh",
+          "voll_essential_inr_per_kwh",
+          "voll_deferrable_inr_per_kwh"
+        ],
+        "title": "EconomicsSpec",
+        "description": "Economic parameters. Prices in INR, energy in kWh, mass in kg."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "phase": {
+            "type": "integer",
+            "title": "Phase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "phase"
+        ],
+        "title": "HealthResponse"
+      },
+      "KPI": {
+        "properties": {
+          "diesel_l": {
+            "type": "number",
+            "title": "Diesel L"
+          },
+          "cost_fuel_inr": {
+            "type": "number",
+            "title": "Cost Fuel Inr"
+          },
+          "cost_total_inr": {
+            "type": "number",
+            "title": "Cost Total Inr"
+          },
+          "co2_kg": {
+            "type": "number",
+            "title": "Co2 Kg"
+          },
+          "renewable_frac": {
+            "type": "number",
+            "title": "Renewable Frac"
+          },
+          "unserved_critical_kwh": {
+            "type": "number",
+            "title": "Unserved Critical Kwh"
+          },
+          "unserved_total_kwh": {
+            "type": "number",
+            "title": "Unserved Total Kwh"
+          },
+          "critical_outage_hours": {
+            "type": "number",
+            "title": "Critical Outage Hours"
+          },
+          "dg_starts": {
+            "type": "integer",
+            "title": "Dg Starts"
+          },
+          "dg_run_hours": {
+            "type": "number",
+            "title": "Dg Run Hours"
+          },
+          "batt_equivalent_full_cycles": {
+            "type": "number",
+            "title": "Batt Equivalent Full Cycles"
+          },
+          "cost_per_delivered_kwh_inr": {
+            "type": "number",
+            "title": "Cost Per Delivered Kwh Inr"
+          },
+          "served_kwh": {
+            "type": "number",
+            "title": "Served Kwh"
+          },
+          "solve_ms_mean": {
+            "type": "number",
+            "title": "Solve Ms Mean"
+          },
+          "solve_ms_p95": {
+            "type": "number",
+            "title": "Solve Ms P95"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diesel_l",
+          "cost_fuel_inr",
+          "cost_total_inr",
+          "co2_kg",
+          "renewable_frac",
+          "unserved_critical_kwh",
+          "unserved_total_kwh",
+          "critical_outage_hours",
+          "dg_starts",
+          "dg_run_hours",
+          "batt_equivalent_full_cycles",
+          "cost_per_delivered_kwh_inr",
+          "served_kwh",
+          "solve_ms_mean",
+          "solve_ms_p95"
+        ],
+        "title": "KPI",
+        "description": "Run-level key performance indicators."
+      },
+      "LiveSolveRequest": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "soc_pct": {
+            "type": "number",
+            "title": "Soc Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon",
+          "soc_pct"
+        ],
+        "title": "LiveSolveRequest",
+        "description": "Body for POST /api/solve_live."
+      },
+      "NewSiteRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "elevation_m": {
+            "type": "number",
+            "title": "Elevation M",
+            "default": 0.0
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Asia/Kolkata"
+          },
+          "pv_capacity_kwp": {
+            "type": "number",
+            "title": "Pv Capacity Kwp"
+          },
+          "battery_capacity_kwh": {
+            "type": "number",
+            "title": "Battery Capacity Kwh"
+          },
+          "diesel_rated_kw": {
+            "type": "number",
+            "title": "Diesel Rated Kw",
+            "default": 0.0
+          },
+          "outage_cost_inr_per_kwh": {
+            "type": "number",
+            "title": "Outage Cost Inr Per Kwh",
+            "default": 500.0
+          },
+          "diesel_price_inr_per_l": {
+            "type": "number",
+            "title": "Diesel Price Inr Per L",
+            "default": 92.5
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "lat",
+          "lon",
+          "pv_capacity_kwp",
+          "battery_capacity_kwh"
+        ],
+        "title": "NewSiteRequest",
+        "description": "Body for POST /api/sites. Minimal input; SiteStore.create derives a\nfull SiteConfig (PV tilt/azimuth by hemisphere, battery/diesel/economics\ndefaults, etc.) from these fields -- see core/site_store.py."
+      },
+      "PVSpec": {
+        "properties": {
+          "capacity_kwp": {
+            "type": "number",
+            "title": "Capacity Kwp"
+          },
+          "tilt_deg": {
+            "type": "number",
+            "title": "Tilt Deg"
+          },
+          "azimuth_deg": {
+            "type": "number",
+            "title": "Azimuth Deg"
+          },
+          "temp_coeff_per_c": {
+            "type": "number",
+            "title": "Temp Coeff Per C"
+          },
+          "derate": {
+            "type": "number",
+            "title": "Derate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capacity_kwp",
+          "tilt_deg",
+          "azimuth_deg",
+          "temp_coeff_per_c",
+          "derate"
+        ],
+        "title": "PVSpec",
+        "description": "Photovoltaic array spec. Power in kW, dt = 1h."
+      },
+      "Provenance": {
+        "properties": {
+          "weather_source": {
+            "type": "string",
+            "title": "Weather Source"
+          },
+          "forecast_method": {
+            "type": "string",
+            "title": "Forecast Method"
+          },
+          "load_method": {
+            "type": "string",
+            "title": "Load Method"
+          },
+          "diesel_price_source": {
+            "type": "string",
+            "title": "Diesel Price Source"
+          },
+          "config_hash": {
+            "type": "string",
+            "title": "Config Hash"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "code_version": {
+            "type": "string",
+            "title": "Code Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weather_source",
+          "forecast_method",
+          "load_method",
+          "diesel_price_source",
+          "config_hash",
+          "generated_at",
+          "code_version"
+        ],
+        "title": "Provenance",
+        "description": "Data lineage / reproducibility metadata for a run."
+      },
+      "ResolveRequest": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/ResolveWeights",
+            "default": {
+              "cost": 1.0,
+              "co2": 1.0,
+              "reliability": 1.0
+            }
+          },
+          "k_uncertainty": {
+            "type": "number",
+            "title": "K Uncertainty"
+          },
+          "diesel_price_inr_per_l": {
+            "type": "number",
+            "title": "Diesel Price Inr Per L"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "k_uncertainty",
+          "diesel_price_inr_per_l"
+        ],
+        "title": "ResolveRequest",
+        "description": "Body for POST /api/resolve."
+      },
+      "ResolveWeights": {
+        "properties": {
+          "cost": {
+            "type": "number",
+            "title": "Cost",
+            "default": 1.0
+          },
+          "co2": {
+            "type": "number",
+            "title": "Co2",
+            "default": 1.0
+          },
+          "reliability": {
+            "type": "number",
+            "title": "Reliability",
+            "default": 1.0
+          }
+        },
+        "type": "object",
+        "title": "ResolveWeights",
+        "description": "Relative cost-tradeoff weights for POST /api/resolve, each 1.0 =\nthe site's configured default."
+      },
+      "RunListEntry": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "policy": {
+            "type": "string",
+            "title": "Policy"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "policy",
+          "name"
+        ],
+        "title": "RunListEntry"
+      },
+      "RunResult": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "policy": {
+            "type": "string",
+            "enum": [
+              "diesel_only",
+              "rule_based",
+              "mpc",
+              "perfect_foresight"
+            ],
+            "title": "Policy"
+          },
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepResult"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "kpi": {
+            "$ref": "#/components/schemas/KPI"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "policy",
+          "site_id",
+          "site_name",
+          "steps",
+          "kpi",
+          "provenance"
+        ],
+        "title": "RunResult",
+        "description": "A complete dispatch run: steps, KPIs, and provenance."
+      },
+      "ScenarioSummary": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "name"
+        ],
+        "title": "ScenarioSummary"
+      },
+      "ServiceInfo": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "docs": {
+            "type": "string",
+            "title": "Docs"
+          },
+          "openapi": {
+            "type": "string",
+            "title": "Openapi"
+          },
+          "health": {
+            "type": "string",
+            "title": "Health"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service",
+          "docs",
+          "openapi",
+          "health"
+        ],
+        "title": "ServiceInfo"
+      },
+      "SiteSummary": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "is_seed": {
+            "type": "boolean",
+            "title": "Is Seed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "display_name",
+          "lat",
+          "lon",
+          "created_at",
+          "is_seed"
+        ],
+        "title": "SiteSummary",
+        "description": "Response shape for GET /api/sites and GET /api/sites/{site_id}."
+      },
+      "SiteUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon"
+          },
+          "elevation_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation M"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "pv": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PVSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WindSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "battery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BatterySpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "diesel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DieselSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "economics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EconomicsSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "horizon_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Hours"
+          },
+          "reserve_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reserve Hours"
+          },
+          "k_uncertainty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "K Uncertainty"
+          }
+        },
+        "type": "object",
+        "title": "SiteUpdateRequest",
+        "description": "Partial update body for PATCH /api/sites/{site_id}. Every field is\noptional; only fields actually present in the request are applied\n(pydantic's exclude_unset, not \"set to None\") -- this preserves the\noriginal dict-based partial-update semantics of SiteStore.update while\ngiving the field a real, documented type instead of an opaque object.\nOn a seed site (khavda), only economics/horizon_hours/reserve_hours/\nk_uncertainty may be present; any other field raises 400."
+      },
+      "StepResult": {
+        "properties": {
+          "t": {
+            "type": "string",
+            "title": "T"
+          },
+          "pv_kw": {
+            "type": "number",
+            "title": "Pv Kw"
+          },
+          "wind_kw": {
+            "type": "number",
+            "title": "Wind Kw"
+          },
+          "dg_kw": {
+            "type": "number",
+            "title": "Dg Kw"
+          },
+          "dg_on": {
+            "type": "integer",
+            "title": "Dg On"
+          },
+          "batt_kw": {
+            "type": "number",
+            "title": "Batt Kw"
+          },
+          "soc_kwh": {
+            "type": "number",
+            "title": "Soc Kwh"
+          },
+          "soc_pct": {
+            "type": "number",
+            "title": "Soc Pct"
+          },
+          "load_critical_kw": {
+            "type": "number",
+            "title": "Load Critical Kw"
+          },
+          "load_essential_kw": {
+            "type": "number",
+            "title": "Load Essential Kw"
+          },
+          "load_deferrable_kw": {
+            "type": "number",
+            "title": "Load Deferrable Kw"
+          },
+          "unserved_critical_kwh": {
+            "type": "number",
+            "title": "Unserved Critical Kwh"
+          },
+          "unserved_essential_kwh": {
+            "type": "number",
+            "title": "Unserved Essential Kwh"
+          },
+          "unserved_deferrable_kwh": {
+            "type": "number",
+            "title": "Unserved Deferrable Kwh"
+          },
+          "curtailed_kwh": {
+            "type": "number",
+            "title": "Curtailed Kwh"
+          },
+          "fuel_l": {
+            "type": "number",
+            "title": "Fuel L"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "reason_text": {
+            "type": "string",
+            "title": "Reason Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "pv_kw",
+          "wind_kw",
+          "dg_kw",
+          "dg_on",
+          "batt_kw",
+          "soc_kwh",
+          "soc_pct",
+          "load_critical_kw",
+          "load_essential_kw",
+          "load_deferrable_kw",
+          "unserved_critical_kwh",
+          "unserved_essential_kwh",
+          "unserved_deferrable_kwh",
+          "curtailed_kwh",
+          "fuel_l",
+          "reason_code",
+          "reason_text"
+        ],
+        "title": "StepResult",
+        "description": "One hourly dispatch step. Power in kW, energy in kWh, fuel in L."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WindSpec": {
+        "properties": {
+          "rated_kw": {
+            "type": "number",
+            "title": "Rated Kw"
+          },
+          "hub_height_m": {
+            "type": "number",
+            "title": "Hub Height M"
+          },
+          "cut_in_ms": {
+            "type": "number",
+            "title": "Cut In Ms"
+          },
+          "rated_ms": {
+            "type": "number",
+            "title": "Rated Ms"
+          },
+          "cut_out_ms": {
+            "type": "number",
+            "title": "Cut Out Ms"
+          },
+          "shear_exp": {
+            "type": "number",
+            "title": "Shear Exp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rated_kw",
+          "hub_height_m",
+          "cut_in_ms",
+          "rated_ms",
+          "cut_out_ms",
+          "shear_exp"
+        ],
+        "title": "WindSpec",
+        "description": "Wind turbine spec. Power in kW, dt = 1h."
+      }
+    }
+  }
+}

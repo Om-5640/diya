@@ -21,6 +21,13 @@ build/
 data/raw/*
 !data/raw/.gitkeep
 
+# Runtime-created sites (via POST /api/sites) -- sites/registry.json itself
+# IS committed (seeded with the khavda record); only per-site directories
+# created at runtime are ignored, since they're ephemeral local state, not
+# part of the repo (see DEPLOYMENT.md's note on Render's free tier having
+# no persistent disk).
+sites/site_*/
+
 # OS / editor
 .DS_Store
 Thumbs.db
