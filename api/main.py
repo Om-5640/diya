@@ -266,18 +266,21 @@ def solve_live(req: LiveSolveRequest) -> RunResult:
 # ---------------------------------------------------------------------------
 # /api/resolve
 #
-# MEASURED TIMING (not a target -- an observed fact, worth knowing before
-# tuning time_limit_s further): a full 168-hour run_mpc call takes ~60-65s
-# regardless of whether time_limit_s is 1.5 or 3.0. Every one of the 168
-# hourly solve_dispatch calls already converges to Optimal in ~200-400ms on
-# average (well under either limit), so the per-solve time budget isn't the
-# bottleneck. The cost is PULP_CBC_CMD's per-call subprocess spawn (writing
-# an LP file, shelling out to cbc.exe, reading the solution back) times 168
-# sequential calls -- inherent to core/milp.py's existing solver invocation,
-# which this phase does not modify. The original ~8s response-time target
-# assumed a much cheaper per-solve cost than CBC's subprocess overhead
-# actually is; ~60-65s is the real, accepted response time for this
-# endpoint as of Phase 4.
+# MEASURED TIMING (updated in DIYA v2 Phase B -- still ~60-65s, NOT fixed by
+# that phase's solver swap, and that's a deliberate, empirically-justified
+# outcome rather than an oversight): run_mpc's rolling window is 24 hours at
+# a time, called 168 times per /api/resolve request. core/milp.py's solver
+# routing (HIGHS_MIN_HORIZON_HOURS) sends horizons this small to
+# PULP_CBC_CMD, not HiGHS, because CBC was measured to be FASTER than HiGHS
+# for this many-small-solves problem shape (HiGHS wins decisively on ONE
+# large solve -- see run_perfect_foresight / scripts/precompute_runs.py,
+# ~7x faster there -- but loses on 168 small ones; see core/milp.py's
+# benchmark comment for the actual numbers). So this endpoint's ~60-65s is
+# still the real, accepted response time: Phase B's genuine win landed on
+# the precompute pipeline, not here. A real fix for /api/resolve would need
+# to stop rebuilding/resolving 168 independent MILPs from scratch (e.g. a
+# persistent warm-started solver across the rolling loop) -- a formulation-
+# adjacent change explicitly out of scope for a solver-backend swap.
 # ---------------------------------------------------------------------------
 
 

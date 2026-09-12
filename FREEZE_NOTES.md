@@ -49,11 +49,25 @@ upper bound, using only real-time forecasts.
 
 ## Known, accepted limitations (don't get caught off guard by these in Q&A)
 
-- `/api/resolve`'s full 168-hour re-solve takes **~60-65 seconds**, not a few
-  seconds — this is CBC subprocess-spawn overhead across 168 sequential solves
-  (see `api/main.py`'s comment above the endpoint), not a bug. The Evidence
-  Stress Test panel's "Re-solving…" state says this explicitly so it doesn't
-  look hung.
+- `/api/resolve`'s full 168-hour re-solve still takes **~60-65 seconds**.
+  DIYA v2 Phase B investigated a CBC-to-HiGHS solver-backend swap
+  specifically to fix this and it did NOT help this endpoint — measured
+  honestly rather than forcing a number. HiGHS's in-process branch-and-bound
+  is genuinely ~7x faster than CBC on ONE large 168-hour MILP (which is why
+  `scripts/precompute_runs.py`'s `perfect_foresight` step dropped from
+  ~30.4s to ~3.9s), but it's measurably *slower* than CBC on the 168
+  *small* 24-hour MILPs `run_mpc` solves one per hour — a known
+  characteristic of the two solvers on small, highly-binary
+  unit-commitment-style problems, not a bug (see `core/milp.py`'s
+  `HIGHS_MIN_HORIZON_HOURS` comment and `scripts/benchmark_solver.py` for
+  the full before/after numbers). So `/api/resolve` and `/api/solve_live`
+  still route to CBC exactly as before, and `/api/resolve`'s ~60-65s is
+  still the real, accepted response time. A genuine fix would need to stop
+  rebuilding/resolving 168 independent MILPs from scratch each call (e.g. a
+  persistent warm-started solver across the rolling loop) — out of scope
+  for a solver-backend swap; a candidate for a future phase. The Evidence
+  Stress Test panel's "Re-solving…" copy already says this explicitly and
+  did not need to change.
 - `/api/solve_live`'s PV/wind conversion always uses Khavda's panel tilt/azimuth
   from `site_khavda.yaml` regardless of the requested lat/lon — a known
   simplification (see `api/main.py`'s `_live_pv_wind_forecast`).
