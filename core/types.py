@@ -235,6 +235,37 @@ class DispatchPlan(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# API request models
+# ---------------------------------------------------------------------------
+
+
+class LiveSolveRequest(BaseModel):
+    """Body for POST /api/solve_live."""
+
+    lat: float
+    lon: float
+    soc_pct: float
+
+
+class ResolveWeights(BaseModel):
+    """Relative cost-tradeoff weights for POST /api/resolve, each 1.0 =
+    the site's configured default."""
+
+    cost: float = 1.0
+    co2: float = 1.0
+    reliability: float = 1.0
+
+
+class ResolveRequest(BaseModel):
+    """Body for POST /api/resolve."""
+
+    scenario_id: str
+    weights: ResolveWeights = ResolveWeights()
+    k_uncertainty: float
+    diesel_price_inr_per_l: float
+
+
+# ---------------------------------------------------------------------------
 # Loader
 # ---------------------------------------------------------------------------
 

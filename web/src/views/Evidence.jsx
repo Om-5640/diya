@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loadRun } from "../lib/loadRun";
 import SegmentedControl from "../components/SegmentedControl";
 import SectionLabel from "../components/SectionLabel";
@@ -37,10 +37,34 @@ const KPI_METRICS = [
   { key: "dg_starts", label: "Diesel Starts", unit: "", higherIsBetter: false, decimals: 0 },
 ];
 
+const DEFAULT_K_UNCERTAINTY = 1.0; // scenarios.yaml has no endpoint exposing this today; 1.0 matches every scenario's current config default
+
+function Slider({ label, value, onChange, min, max, step = 0.1, format }) {
+  return (
+    <label className="flex flex-col gap-1.5 text-body text-text-secondary min-w-[180px]">
+      <span className="flex items-center justify-between">
+        <span>{label}</span>
+        <span className="tabular-nums text-text-primary">{format ? format(value) : value}</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="accent-[var(--accent-battery)]"
+      />
+    </label>
+  );
+}
+
 /**
  * Analytical workspace: scenario + policy-pair selectors, KPI delta row,
  * two synchronized DispatchTimelines with a shared crosshair + reason
- * panel, and a 4-way KPI reference table toggle. Static JSON only.
+ * panel, a 4-way KPI reference table toggle, and a Stress Test panel that
+ * re-solves "mpc" against /api/resolve. Static JSON is the default on
+ * mount -- /api/resolve is only ever called when "Re-solve" is clicked.
  */
 export default function Evidence() {
   const [scenario, setScenario] = useState("S2");
@@ -50,11 +74,20 @@ export default function Evidence() {
   const [showTable, setShowTable] = useState(false);
   const [error, setError] = useState(null);
 
+  const [costWeight, setCostWeight] = useState(1.0);
+  const [co2Weight, setCo2Weight] = useState(1.0);
+  const [reliabilityWeight, setReliabilityWeight] = useState(1.0);
+  const [dieselPrice, setDieselPrice] = useState(null);
+  const [kUncertainty, setKUncertainty] = useState(DEFAULT_K_UNCERTAINTY);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolveError, setResolveError] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
     setRuns({});
     setHoveredIndex(null);
     setError(null);
+    setResolveError(null);
     Promise.all(ALL_POLICIES.map((p) => loadRun(scenario, p).then((data) => [p, data])))
       .then((entries) => {
         if (cancelled) return;
@@ -63,6 +96,17 @@ export default function Evidence() {
           map[p] = data;
         });
         setRuns(map);
+        // Default diesel price derived from the loaded scenario's own KPI
+        // (cost_fuel_inr / diesel_l recovers the exact effective price the
+        // precompute used) -- no endpoint exposes raw economics directly.
+        const mpcKpi = map.mpc?.kpi;
+        if (mpcKpi && mpcKpi.diesel_l > 0) {
+          setDieselPrice(Number((mpcKpi.cost_fuel_inr / mpcKpi.diesel_l).toFixed(2)));
+        }
+        setKUncertainty(DEFAULT_K_UNCERTAINTY);
+        setCostWeight(1.0);
+        setCo2Weight(1.0);
+        setReliabilityWeight(1.0);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -72,7 +116,33 @@ export default function Evidence() {
     };
   }, [scenario]);
 
-  const pair = POLICY_PAIRS.find((p) => p.value === pairKey);
+  const pair = useMemo(() => POLICY_PAIRS.find((p) => p.value === pairKey), [pairKey]);
+
+  const handleResolve = () => {
+    setIsResolving(true);
+    setResolveError(null);
+    fetch("/api/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario_id: scenario,
+        weights: { cost: costWeight, co2: co2Weight, reliability: reliabilityWeight },
+        k_uncertainty: kUncertainty,
+        diesel_price_inr_per_l: dieselPrice,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`resolve HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        setRuns((prev) => ({ ...prev, mpc: data }));
+      })
+      .catch((err) => {
+        setResolveError(err.message);
+      })
+      .finally(() => setIsResolving(false));
+  };
 
   if (error) {
     return <div className="p-6 text-body text-status-critical">Failed to load run data: {error}</div>;
@@ -163,6 +233,75 @@ export default function Evidence() {
             <KpiReferenceTable runs={runs} />
           </div>
         )}
+      </div>
+
+      <div className="border-t border-border-subtle pt-8">
+        <SectionLabel className="mb-4">Stress Test</SectionLabel>
+        <div className="border border-border-subtle rounded p-6 flex flex-col gap-6">
+          <div className="flex flex-wrap gap-6">
+            <Slider
+              label="Cost weight"
+              value={costWeight}
+              onChange={setCostWeight}
+              min={0.5}
+              max={2.0}
+              format={(v) => v.toFixed(2)}
+            />
+            <Slider
+              label="CO2 weight"
+              value={co2Weight}
+              onChange={setCo2Weight}
+              min={0.5}
+              max={2.0}
+              format={(v) => v.toFixed(2)}
+            />
+            <Slider
+              label="Reliability weight"
+              value={reliabilityWeight}
+              onChange={setReliabilityWeight}
+              min={0.5}
+              max={2.0}
+              format={(v) => v.toFixed(2)}
+            />
+            <Slider
+              label="k_uncertainty"
+              value={kUncertainty}
+              onChange={setKUncertainty}
+              min={1.0}
+              max={2.0}
+              format={(v) => v.toFixed(2)}
+            />
+            <label className="flex flex-col gap-1.5 text-body text-text-secondary min-w-[160px]">
+              <span>Diesel price (INR/L)</span>
+              <input
+                type="number"
+                step="0.1"
+                value={dieselPrice ?? ""}
+                onChange={(e) => setDieselPrice(Number(e.target.value))}
+                className="bg-bg-panel-raised border border-border-subtle rounded-sm px-2 py-1.5 text-text-primary tabular-nums w-28"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            <button
+              type="button"
+              onClick={handleResolve}
+              disabled={isResolving || dieselPrice == null}
+              className="text-body text-text-primary border border-border-strong hover:bg-bg-panel-raised rounded-sm px-4 py-2 transition-colors duration-150 ease-out disabled:opacity-60"
+            >
+              {isResolving ? "Re-solving…" : "Re-solve"}
+            </button>
+            {isResolving && (
+              <span className="text-meta text-text-tertiary">
+                Re-solving… (a full 168-hour re-optimization, this can take up to ~60s)
+              </span>
+            )}
+            {resolveError && !isResolving && (
+              <span className="text-meta text-status-critical">Re-solve failed: {resolveError}</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
