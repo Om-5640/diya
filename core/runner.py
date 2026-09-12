@@ -29,6 +29,7 @@ def run_scenario_policy(
     scenario_cfg: dict,
     max_hours: int | None = None,
     mpc_time_limit_s: float = 3.0,
+    parquet_path: Path | None = None,
 ) -> RunResult:
     """Load scenario data, apply the scenario's diesel_price_multiplier to
     a copy of site.economics (load_multiplier is already baked into the
@@ -39,8 +40,13 @@ def run_scenario_policy(
     solves only (not perfect_foresight's single solve) -- tests pass a
     smaller value (2.0) to keep a 168-hour, up-to-168-solve mpc run fast;
     scripts/precompute_runs.py uses the 3.0 default.
+
+    `parquet_path` defaults to khavda's legacy PROCESSED_DIR/{scenario_id}
+    .parquet, unchanged -- core/site_pipeline.py (Phase E) passes an
+    explicit path so any site's own scenarios_dir works identically.
     """
-    parquet_path = PROCESSED_DIR / f"{scenario_id}.parquet"
+    if parquet_path is None:
+        parquet_path = PROCESSED_DIR / f"{scenario_id}.parquet"
     df = pd.read_parquet(parquet_path)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 

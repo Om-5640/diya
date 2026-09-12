@@ -220,7 +220,7 @@
     "/api/sites/{site_id}/scenarios": {
       "get": {
         "summary": "List Site Scenarios",
-        "description": "List the scenarios available for a site.\n\nFor khavda, returns the human-named S1/S2/S3 scenarios defined in\nconfig/scenarios.yaml. For any other site, returns one entry per\nscenario parquet file found under that site's own scenarios directory\n(id and name are the same string, since new sites have no separate\nhuman-naming step yet) -- an empty list if none have been uploaded.\n\nErrors: 404 if site_id is not registered.",
+        "description": "List the scenarios available for a site.\n\nReads scenarios.yaml (khavda's hand-written config/scenarios.yaml, or a\ngenerated site's {scenarios_dir}/scenarios.yaml from\ncore.site_pipeline.build_site_scenarios -- both parsed the same way)\nwhen it exists. Falls back to one entry per scenario parquet file\npresent (id and name both the filename stem) only if no scenarios.yaml\nexists at all -- an empty list if neither exists yet (e.g. a brand-new\nsite whose pipeline hasn't finished).\n\nErrors: 404 if site_id is not registered.",
         "operationId": "list_site_scenarios_api_sites__site_id__scenarios_get",
         "parameters": [
           {
@@ -285,7 +285,7 @@
       },
       "post": {
         "summary": "Create Site",
-        "description": "Register a new site, deriving a full SiteConfig from minimal input.\n\nExample request body:\n    {\"display_name\": \"Example Site\", \"lat\": -33.9, \"lon\": 18.4,\n     \"pv_capacity_kwp\": 10.0, \"battery_capacity_kwh\": 30.0}\n\nPV tilt/azimuth are derived from lat (tilt = abs(lat), array facing the\nequator); wind is omitted (rated_kw=0); battery is sized at a 3-hour\nC-rate; diesel reuses Khavda's combustion-property constants at the\ngiven (or default) rated_kw; VOLL values are ratios of\noutage_cost_inr_per_kwh. See core/site_store.py for the exact defaults.\n\nNo error cases beyond standard 422 body validation.",
+        "description": "Register a new site, deriving a full SiteConfig from minimal input,\nand enqueue a background job (DIYA v2 Phase E) that builds it a real\nyear of historical scenarios and precomputes all 4 policies' runs --\nsee core/site_pipeline.py and core/pipeline_worker.py. This response\nreturns immediately with the site_id; the pipeline runs in the\nbackground and never blocks this request. Poll\nGET /api/sites/{site_id}/pipeline_status (or check\nGET /api/sites/{site_id}/overview's status field) to track it.\n\nExample request body:\n    {\"display_name\": \"Example Site\", \"lat\": -33.9, \"lon\": 18.4,\n     \"pv_capacity_kwp\": 10.0, \"battery_capacity_kwh\": 30.0}\n\nPV tilt/azimuth are derived from lat (tilt = abs(lat), array facing the\nequator); wind is omitted (rated_kw=0); battery is sized at a 3-hour\nC-rate; diesel reuses Khavda's combustion-property constants at the\ngiven (or default) rated_kw; VOLL values are ratios of\noutage_cost_inr_per_kwh. See core/site_store.py for the exact defaults.\n\nNo error cases beyond standard 422 body validation.",
         "operationId": "create_site_api_sites_post",
         "requestBody": {
           "content": {
@@ -699,7 +699,7 @@
     "/api/sites/{site_id}/overview": {
       "get": {
         "summary": "Site Overview",
-        "description": "One-call dashboard summary for a site: its registry summary, the\ncurrent hour's dispatch step (the first step of a fresh 72h live solve\n-- the exact same _solve_live internal that POST /solve_live uses, not\na duplicate), and whether it has precomputed scenario runs yet.\n\n`status` is exactly \"live_only\" (no precomputed runs -- the honest\ndescription of a brand-new site; NOT \"building_baseline\", since no\nbackground job producing one exists until Phase E) or \"full\".\n\nErrors: 404 if site_id is not registered.",
+        "description": "One-call dashboard summary for a site: its registry summary, the\ncurrent hour's dispatch step (the first step of a fresh 72h live solve\n-- the exact same _solve_live internal that POST /solve_live uses, not\na duplicate), and its pipeline status.\n\n`status` is exactly one of: \"live_only\" (no job has run and no\nprecomputed data exists), \"building\" (a Phase E pipeline job is queued\nor running for this site), \"full\" (precomputed runs exist), or\n\"failed\" (the most recent job failed and no precomputed data exists).\n\nErrors: 404 if site_id is not registered.",
         "operationId": "site_overview_api_sites__site_id__overview_get",
         "parameters": [
           {
@@ -719,6 +719,86 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SiteOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/pipeline_status": {
+      "get": {
+        "summary": "Pipeline Status",
+        "description": "Current status of this site's Phase E background build+precompute\njob: queued/running/complete/failed, plus the current stage name\n(e.g. \"fetching_weather\", \"precomputing_mpc_S2\") while running.\n\n\"not_started\" (not one of PipelineJob's own 4 statuses -- synthesized\nhere) means no job has ever run for this site AND it has no\nprecomputed runs: a genuinely untouched new site, not a fabricated\nqueued job. khavda (and any seed site) always reads \"complete\".\n\nErrors: 404 if site_id is not registered.",
+        "operationId": "pipeline_status_api_sites__site_id__pipeline_status_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/rebuild": {
+      "post": {
+        "summary": "Rebuild Site",
+        "description": "Re-enqueue this site's Phase E build+precompute pipeline, discarding\nany previous completed/failed job record and starting fresh.\n\nReal-world use case: Render's free tier has no persistent disk (see\nDEPLOYMENT.md), so a redeploy or container restart wipes a site's\ngenerated scenarios/runs -- this endpoint regenerates them without\nhaving to delete and recreate the site.\n\nErrors: 404 if site_id is not registered. 400/403 if site_id is a seed\nsite (khavda) -- its data is never rebuilt through this API, same\nprotection pattern as DELETE/PATCH.",
+        "operationId": "rebuild_site_api_sites__site_id__rebuild_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStatusResponse"
                 }
               }
             }
@@ -815,7 +895,7 @@
     "/api/sites/{site_id}/evidence": {
       "get": {
         "summary": "Site Evidence",
-        "description": "The four-policy comparison (rule_based / mpc / diesel_only /\nperfect_foresight) for one scenario, plus a server-computed delta block\n-- the frontend must never compute these deltas itself.\n\nExample: GET /api/sites/khavda/evidence?scenario=S2\n\n`scenario` defaults to the first available from GET .../scenarios.\n`description` is read directly from config/scenarios.yaml (khavda only,\nnever duplicated/hardcoded elsewhere); null for sites with no\nscenarios.yaml-equivalent yet -- never invented.\n\nErrors: 404 if site_id is not registered, if it has no precomputed runs\nat all, or if the chosen scenario is missing any of the 4 required\npolicy runs.",
+        "description": "The four-policy comparison (rule_based / mpc / diesel_only /\nperfect_foresight) for one scenario, plus a server-computed delta block\n-- the frontend must never compute these deltas itself.\n\nExample: GET /api/sites/khavda/evidence?scenario=S2\n\n`scenario` defaults to the first available from GET .../scenarios.\n`description` is read directly from the site's scenarios.yaml (khavda's\nhand-written config/scenarios.yaml, or a generated site's own\n{scenarios_dir}/scenarios.yaml from Phase E's pipeline -- never\nduplicated/hardcoded elsewhere); null for a site with no\nscenarios.yaml at all yet -- never invented.\n\nErrors: 404 if site_id is not registered, if it has no precomputed runs\nat all, or if the chosen scenario is missing any of the 4 required\npolicy runs.",
         "operationId": "site_evidence_api_sites__site_id__evidence_get",
         "parameters": [
           {
@@ -1573,6 +1653,79 @@
         "title": "PVSpec",
         "description": "Photovoltaic array spec. Power in kW, dt = 1h."
       },
+      "PipelineStatusResponse": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "queued",
+              "running",
+              "complete",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "status",
+          "stage",
+          "started_at",
+          "finished_at",
+          "error"
+        ],
+        "title": "PipelineStatusResponse"
+      },
       "Provenance": {
         "properties": {
           "weather_source": {
@@ -1808,7 +1961,9 @@
             "type": "string",
             "enum": [
               "live_only",
-              "full"
+              "building",
+              "full",
+              "failed"
             ],
             "title": "Status"
           },

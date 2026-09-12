@@ -18,6 +18,15 @@ S1), which is the genuinely slow ~60-65s rolling-MPC re-solve documented in
 api/main.py and FREEZE_NOTES.md -- expect this script to take about a
 minute to run, not seconds.
 
+DIYA v2 Phase E: creating the throwaway site also enqueues a real
+365-day build+precompute background job (core/pipeline_worker.py) -- this
+script does not fast-mode it (unlike the test suite's tests/conftest.py),
+so its pipeline_status example is captured mid-flight, not waited out to
+completion. The throwaway site is deleted at the end of this function
+while that job may still be running in the background; the worker thread
+dies with the process when this script exits, same as any other
+short-lived script run.
+
 GEOCODE EXAMPLES ARE THE ONE EXCEPTION TO "REAL NETWORK CALL": Nominatim
 returns 403 Forbidden from several sandboxed/CI network environments
 (observed directly while building Phase C.6 -- not a code bug, core/geocode.py
@@ -69,6 +78,8 @@ SITE_SCOPED_ROUTES: list[tuple[str, str]] = [
     ("GET", "/api/sites/{site_id}"),
     ("PATCH", "/api/sites/{site_id}"),
     ("DELETE", "/api/sites/{site_id}"),
+    ("GET", "/api/sites/{site_id}/pipeline_status"),
+    ("POST", "/api/sites/{site_id}/rebuild"),
     ("GET", "/api/sites/{site_id}/scenarios"),
     ("GET", "/api/sites/{site_id}/runs"),
     ("GET", "/api/sites/{site_id}/runs/{scenario_id}/{policy}"),
@@ -229,10 +240,47 @@ def _capture_examples() -> dict[tuple[str, str], list[Example]]:
         desc="Seed sites can never be deleted -> 400",
     )
 
+    record(
+        "GET",
+        "/api/sites/{site_id}/pipeline_status",
+        "/api/sites/khavda/pipeline_status",
+        client.get("/api/sites/khavda/pipeline_status"),
+        desc="Khavda: always complete, no job ever runs for a seed site",
+    )
+    record(
+        "POST",
+        "/api/sites/{site_id}/rebuild",
+        "/api/sites/khavda/rebuild",
+        client.post("/api/sites/khavda/rebuild"),
+        desc="Seed sites can never be rebuilt through this API -> 400",
+    )
+
     # --- Site-scoped: write routes on one throwaway test site ---
     create_resp = client.post("/api/sites", json=NEW_SITE_BODY)
     record("POST", "/api/sites", "/api/sites", create_resp, req_body=NEW_SITE_BODY, desc="Register a new site")
     site_id = create_resp.json()["site_id"]
+
+    # DIYA v2 Phase E: creating a site enqueues a real background
+    # build+precompute job immediately (this script does not fast-mode it,
+    # unlike the test suite -- it's the same real 365-day default a genuine
+    # new site gets). Captured here at its natural, still-in-progress state,
+    # the same honest-capture spirit as the "no precomputed runs yet" 404
+    # right below -- not waited out to completion (that would make this
+    # script take as long as a real historical build, not seconds).
+    record(
+        "GET",
+        "/api/sites/{site_id}/pipeline_status",
+        f"/api/sites/{site_id}/pipeline_status",
+        client.get(f"/api/sites/{site_id}/pipeline_status"),
+        desc="A brand-new site's pipeline job shortly after creation",
+    )
+    record(
+        "POST",
+        "/api/sites/{site_id}/rebuild",
+        f"/api/sites/{site_id}/rebuild",
+        client.post(f"/api/sites/{site_id}/rebuild"),
+        desc="Re-enqueuing while a job is already in progress returns the SAME job, not a duplicate",
+    )
 
     record(
         "GET",

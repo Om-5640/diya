@@ -11,15 +11,23 @@ pulled directly from the real precomputed run JSON (`data/processed/runs/S2_*.js
 | diesel_only | 945.48 | 96,948.32 | 2,533.90 | 0.000 | 1 |
 | rule_based | 568.25 | 56,933.76 | 1,522.90 | 0.464 | 7 |
 | **mpc** | **403.08** | **41,754.76** | **1,080.25** | **0.567** | 13 |
-| perfect_foresight | 287.46 | 32,632.20 | 770.40 | 0.632 | 8 |
+| perfect_foresight | 287.18 | 32,765.89 | 769.66 | 0.629 | 9 |
 
 Critical outage hours are **0.0 for every policy** on S2 — the story is cost/fuel/CO2
 efficiency, not reliability, on this scenario.
 
 **benefit_capture** (mpc's share of the cost gap between rule_based and
-perfect_foresight) = **62.5%** — mpc closes just under two-thirds of the
+perfect_foresight) = **62.8%** — mpc closes just under two-thirds of the
 theoretical gap between the naive baseline and the unattainable perfect-foresight
 upper bound, using only real-time forecasts.
+
+(perfect_foresight's row was refreshed in DIYA v2 Phase E: re-running
+scripts/precompute_runs.py revealed the committed run JSON had never been
+regenerated since Phase B's CBC->HiGHS solver swap -- HiGHS finds a
+different but equally-optimal 168h solution on this unconstrained
+dimension, the same solver-tiebreak class documented in
+tests/test_golden_kpis.py's `_SOLVER_TIEBREAK_FIELDS`. mpc and diesel_only/
+rule_based are deterministic and unaffected.)
 
 ## Freeze checklist
 

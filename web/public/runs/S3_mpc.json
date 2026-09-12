@@ -3379,8 +3379,8 @@
     "batt_equivalent_full_cycles": 5.3151190903068875,
     "cost_per_delivered_kwh_inr": 21.827570502979114,
     "served_kwh": 2937.735584602331,
-    "solve_ms_mean": 175.09756011909735,
-    "solve_ms_p95": 269.6971150000536
+    "solve_ms_mean": 152.55968869020026,
+    "solve_ms_p95": 235.70466999517524
   },
   "provenance": {
     "weather_source": "open-meteo-archive",
@@ -3388,7 +3388,7 @@
     "load_method": "synthetic-seeded-v1",
     "diesel_price_source": "PPAC Gujarat retail selling price — PLACEHOLDER, verify before demo",
     "config_hash": "c8b5f984",
-    "generated_at": "2026-09-11T23:00:14.896281+00:00",
+    "generated_at": "2026-09-12T17:45:50.885350+00:00",
     "code_version": "phase3"
   },
   "notes": ""

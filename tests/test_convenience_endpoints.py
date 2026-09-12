@@ -161,8 +161,21 @@ def test_overview_new_site_is_live_only(temp_site):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "live_only"
-    assert data["has_precomputed_runs"] is False
+    # DIYA v2 Phase E: POST /api/sites now enqueues a background pipeline
+    # job immediately, so a brand-new site's status is "building" (job
+    # queued/running) as soon as one has ever been enqueued for it, not
+    # "live_only" (which now specifically means no job has ever run) --
+    # timing-dependent which of the two this reads as right after
+    # creation, but status must never already be "full": _derive_overview_
+    # status checks the job's own queued/running state FIRST, before ever
+    # looking at has_precomputed_runs, specifically so this holds even
+    # though has_precomputed_runs itself can legitimately already be True
+    # this early (core.site_pipeline.precompute_site_runs writes each
+    # policy's file to disk as it finishes, and diesel_only/rule_based --
+    # no MILP solving -- can complete before mpc/perfect_foresight do, so
+    # "at least one run file exists" is not the same claim as "the job is
+    # done"). has_precomputed_runs is intentionally not asserted here.
+    assert data["status"] in ("live_only", "building")
 
 
 def test_overview_unknown_site_404():
