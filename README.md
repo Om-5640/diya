@@ -19,22 +19,20 @@ another timestep. Every field name carries its unit suffix (`_kw`, `_kwh`, `_l`,
 
 ## How to run
 
-```bash
-make install   # pip install -r requirements.txt
-make mock      # generate mock RunResult JSON into web/public/runs/ and data/processed/mock/
-make test      # pytest -q  (contract tests, <3s)
-make api       # uvicorn api.main:app --reload --port 8000
-make all       # install, mock, test
-```
-
-Or without `make`:
+This project has no `make` dependency — everything runs through Python,
+since that's the one tool every part of the stack already shares.
 
 ```bash
 pip install -r requirements.txt
-python -m core.mock
-pytest -q
-uvicorn api.main:app --reload --port 8000
+python scripts/build_scenarios.py      # only needed once, or after a config change
+python scripts/precompute_runs.py      # only needed once, or after a config change
+python scripts/smoke_test.py           # verify everything is intact
+python scripts/run_demo.py             # starts both servers, prints URLs
 ```
+
+`run_demo.py` starts the FastAPI backend and the Vite dev server together,
+waits for both to report healthy, prints their URLs, and cleanly stops both
+(no orphaned processes) on Ctrl+C.
 
 ## Config values: measured vs. assumed
 

@@ -3388,7 +3388,7 @@
     "load_method": "mock",
     "diesel_price_source": "PPAC Gujarat retail selling price — PLACEHOLDER, verify before demo",
     "config_hash": "5af3b34d",
-    "generated_at": "2026-09-12T04:23:13.127428+00:00",
+    "generated_at": "2026-09-12T05:38:02.206108+00:00",
     "code_version": "0.1.0-phase0"
   },
   "notes": "Phase 0 mock data — not a real dispatch solve."
