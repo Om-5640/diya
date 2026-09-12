@@ -171,3 +171,42 @@ def test_progress_callback_sees_multiple_distinct_stages(tmp_path, site):
         assert any(s.startswith(f"precomputing_{policy}_") for s in precompute_stages), (
             f"no precompute stage seen for policy={policy}: {precompute_stages}"
         )
+
+
+# ---------------------------------------------------------------------------
+# BUGFIX-1: a site created with diesel omitted must show zero diesel
+# activity across the ENTIRE real pipeline -- not just in an isolated MILP
+# toy instance (tests/test_milp.py covers that), but through the real
+# SiteStore.create() construction path and all 4 real policies.
+# ---------------------------------------------------------------------------
+
+
+def test_diesel_omitted_site_shows_zero_diesel_activity_across_full_pipeline(tmp_path):
+    from core.site_store import SiteStore
+    from core.types import NewSiteRequest
+
+    store = SiteStore(registry_path=tmp_path / "registry.json", site_dir_base=tmp_path / "sites")
+    req = NewSiteRequest(
+        display_name="Diesel Omitted Test Site",
+        lat=-33.9,
+        lon=18.4,
+        pv_capacity_kwp=15.0,
+        battery_capacity_kwh=20.0,
+        # diesel_rated_kw deliberately omitted, matching a form field left blank
+    )
+    record = store.create(req)
+    site = store.load_config(record.site_id)
+    assert site.diesel.rated_kw == 0.0
+
+    scenarios_dir = store.scenarios_dir_path(record.site_id)
+    runs_dir = store.runs_dir_path(record.site_id)
+    _fast_build(record.site_id, site, scenarios_dir)
+    result = precompute_site_runs(record.site_id, site, scenarios_dir, runs_dir, mpc_time_limit_s=2.0)
+
+    assert len(result.runs) == 12  # 3 scenarios x 4 policies
+    for (scenario_id, policy), run in result.runs.items():
+        assert run.kpi.diesel_l == pytest.approx(0.0, abs=1e-9), f"{scenario_id}/{policy}: diesel_l != 0"
+        assert run.kpi.dg_starts == 0, f"{scenario_id}/{policy}: dg_starts != 0 (phantom diesel start)"
+        for step in run.steps:
+            assert step.dg_kw == pytest.approx(0.0, abs=1e-9), f"{scenario_id}/{policy}: dg_kw != 0 at {step.t}"
+            assert step.fuel_l == pytest.approx(0.0, abs=1e-9), f"{scenario_id}/{policy}: fuel_l != 0 at {step.t}"

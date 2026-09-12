@@ -230,7 +230,21 @@ def solve_dispatch(
         # C9 reserve — soc[t] must stay above soc_min plus a forward-looking
         # reserve for critical load, capped so it never conflicts with C4's
         # soc_max upper bound. Skipped entirely when reserve_hours <= 0.
-        if reserve_hours > 0:
+        #
+        # BUGFIX-1: also skipped when diesel is disabled (rated_kw<=0). This
+        # reserve exists to protect against a delayed/avoided diesel start
+        # (R4_RESERVE_HOLD's own reason text is literally about that
+        # tradeoff) -- it assumes diesel is available as an eventual
+        # backstop that will draw on/justify the held-back energy. With no
+        # diesel at all, there is nothing to wait for: withholding battery
+        # capacity serves no protective purpose and only forces needless
+        # unserved critical load once SOC reaches the floor, confirmed via
+        # a hand-verified toy instance (tests/test_milp.py) that shows
+        # reserve_hours=3 leaving load unserved with headroom still
+        # available, while reserve_hours=0 on the identical instance serves
+        # 100% of load down to soc_min. Khavda always has diesel.rated_kw>0,
+        # so this condition never applies to it -- zero behavior change.
+        if reserve_hours > 0 and not diesel_disabled:
             window_start = t + 1
             window_end = min(t + 1 + reserve_hours, H)
             if window_start >= H:

@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -232,6 +233,40 @@ def test_dispatch_new_site_range_168_returns_expected_404(temp_site):
 def test_dispatch_invalid_range_422():
     resp = client.get("/api/sites/khavda/dispatch?range=24")
     assert resp.status_code == 422
+
+
+def test_dispatch_source_live_on_site_with_precomputed_runs_returns_live_data():
+    """BUGFIX-1: source=live must always force a fresh live solve, even on
+    a site (khavda) whose precomputed runs "auto" would otherwise prefer --
+    otherwise a site's near-term forecast view is permanently stuck on
+    historical scenario dates once its backfill completes."""
+    resp = client.get("/api/sites/khavda/dispatch?range=72&source=live")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["source"] == "live"
+    assert data["scenario_id"] == "LIVE"
+    assert len(data["steps"]) == 72
+
+    current_year = str(datetime.now().year)
+    assert data["steps"][0]["t"].startswith(current_year), (
+        f"expected a recent/live timestamp (year {current_year}), got {data['steps'][0]['t']!r}"
+    )
+
+
+def test_dispatch_source_live_range_168_returns_400_exact_message():
+    resp = client.get("/api/sites/khavda/dispatch?range=168&source=live")
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Live mode only supports up to 72 hours"
+
+
+def test_dispatch_source_precomputed_explicit_matches_auto():
+    auto_resp = client.get("/api/sites/khavda/dispatch?range=72")
+    explicit_resp = client.get("/api/sites/khavda/dispatch?range=72&source=precomputed")
+
+    assert explicit_resp.status_code == 200
+    assert explicit_resp.json() == auto_resp.json()
 
 
 # ---------------------------------------------------------------------------

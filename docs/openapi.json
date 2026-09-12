@@ -819,7 +819,7 @@
     "/api/sites/{site_id}/dispatch": {
       "get": {
         "summary": "Site Dispatch",
-        "description": "Dispatch steps for charting, from whichever source this site\nactually has: a precomputed run's steps (truncated to `range` hours from\nthe start) if any exist, otherwise a fresh live solve.\n\nExample: GET /api/sites/khavda/dispatch?range=72\n\nIf precomputed runs exist: `scenario` defaults to the first one from\nGET .../scenarios, `policy` defaults to \"mpc\".\n\nIf NO precomputed runs exist (a brand-new site): range<=72 falls back to\nthe same live solve /overview uses (always the full 72h it produces,\nregardless of the exact range<=72 requested); range=168 is refused\nrather than fabricated from a 72h live solve.\n\nErrors: 404 if site_id is not registered, if no scenarios/runs are\navailable to satisfy a precomputed request, or if range=168 is\nrequested for a site with no precomputed runs (\"Full week analysis\nrequires historical scenario data, not yet available for this site\").\n422 if range is anything other than 72 or 168.",
+        "description": "Dispatch steps for charting.\n\nExample: GET /api/sites/khavda/dispatch?range=72\n\n`source` controls where the steps come from (BUGFIX-1):\n- \"live\": always a fresh live solve, even if precomputed runs exist --\n  this is the only way to get a genuine near-term forecast for a site\n  whose backfill has already completed (otherwise \"auto\" permanently\n  prefers historical scenario data once it exists). range must be <=72\n  in this mode; range=168 with source=live is refused (400) rather\n  than fabricated from a 72h live solve.\n- \"precomputed\": always a precomputed run's steps (truncated to `range`\n  hours from the start); 404 if none exists for this site/scenario/\n  policy.\n- \"auto\" (default): EXACTLY the pre-existing behavior, unchanged --\n  prefers precomputed data whenever any exists, otherwise falls back\n  to the same live solve /overview uses (always the full 72h it\n  produces, regardless of the exact range<=72 requested), refusing\n  range=168 (404) rather than fabricating a week from a 72h live solve.\n\nIf precomputed runs exist (source=\"auto\" or \"precomputed\"): `scenario`\ndefaults to the first one from GET .../scenarios, `policy` defaults to\n\"mpc\".\n\nErrors: 404 if site_id is not registered, if no scenarios/runs are\navailable to satisfy a precomputed request, or (source=\"auto\" only)\nif range=168 is requested for a site with no precomputed runs (\"Full\nweek analysis requires historical scenario data, not yet available\nfor this site\"). 400 if source=\"live\" and range=168 (\"Live mode only\nsupports up to 72 hours\"). 422 if range is anything other than 72 or\n168.",
         "operationId": "site_dispatch_api_sites__site_id__dispatch_get",
         "parameters": [
           {
@@ -865,6 +865,21 @@
               "type": "string",
               "default": "mpc",
               "title": "Policy"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "auto",
+                "live",
+                "precomputed"
+              ],
+              "type": "string",
+              "default": "auto",
+              "title": "Source"
             }
           }
         ],

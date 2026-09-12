@@ -369,7 +369,19 @@ def _capture_examples() -> dict[tuple[str, str], list[Example]]:
     record(
         "GET", "/api/sites/{site_id}/dispatch", "/api/sites/khavda/dispatch?range=72",
         client.get("/api/sites/khavda/dispatch?range=72"),
-        desc="Khavda: precomputed source, truncated to 72h",
+        desc="Khavda: source=auto (default) prefers precomputed data, truncated to 72h",
+    )
+    # BUGFIX-1: source=live/precomputed give explicit control over
+    # /dispatch's data source instead of always deferring to "auto".
+    record(
+        "GET", "/api/sites/{site_id}/dispatch", "/api/sites/khavda/dispatch?range=72&source=live",
+        client.get("/api/sites/khavda/dispatch?range=72&source=live"),
+        desc="Khavda: source=live forces a fresh live solve even though precomputed data exists",
+    )
+    record(
+        "GET", "/api/sites/{site_id}/dispatch", "/api/sites/khavda/dispatch?range=168&source=live",
+        client.get("/api/sites/khavda/dispatch?range=168&source=live"),
+        desc="source=live only supports up to 72h -> 400",
     )
     record(
         "GET", "/api/sites/{site_id}/evidence", "/api/sites/khavda/evidence?scenario=S2",

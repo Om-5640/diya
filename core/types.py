@@ -25,12 +25,22 @@ from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Reason codes — operator-facing explanations attached to every dispatch step.
+#
+# BUGFIX-1: these were originally a static dict of khavda-flavored final
+# text ("the health centre", "the RO water plant / flour mill" baked in),
+# which is actively misleading for a non-village site (e.g. a college
+# campus). REASON_CODES now holds TEMPLATES (str.format placeholders);
+# reason_text_for() substitutes each SiteConfig's own
+# critical_load_label/deferrable_load_label to produce the final text.
+# Khavda's config sets those labels to its existing wording exactly, so its
+# reason_text output is byte-identical to before this refactor -- verified
+# directly against its precomputed runs, not assumed.
 # ---------------------------------------------------------------------------
 
 REASON_CODES: dict[str, str] = {
     "R1_PREPOSITION": (
         "Starting diesel early — low solar and wind expected this evening; "
-        "preserving battery for the health centre."
+        "preserving battery for {critical_load_label}."
     ),
     "R2_SOLAR_SURPLUS": "Charging the battery from surplus solar and wind.",
     "R3_CHEAPER_DIESEL": (
@@ -38,16 +48,16 @@ REASON_CODES: dict[str, str] = {
         "the configured costs."
     ),
     "R4_RESERVE_HOLD": (
-        "Holding energy in reserve — that is the health centre's supply for "
+        "Holding energy in reserve — that is {critical_load_label}'s supply for "
         "the next few hours."
     ),
     "R5_MINLOAD": "Diesel held at minimum load — running it lower would waste fuel.",
     "R6_AVOID_START": "Avoiding a generator start; the battery covers this gap.",
     "R7_SHED_DEFERRABLE": (
-        "Deferring the RO water plant / flour mill to protect essential supply."
+        "Deferring {deferrable_load_label} to protect essential supply."
     ),
     "R8_CRITICAL_DEFICIT": (
-        "WARNING: health-centre demand cannot be fully met with available "
+        "WARNING: {critical_load_adjective} demand cannot be fully met with available "
         "capacity. This is a sizing shortfall, not a dispatch choice."
     ),
     "R0_NOMINAL": "Renewables are covering demand.",
@@ -55,6 +65,30 @@ REASON_CODES: dict[str, str] = {
         "Diesel running continuously — this baseline does not use solar, wind or battery."
     ),
 }
+
+
+def _adjective_form(label: str) -> str:
+    """"the health centre" -> "health-centre": strips a leading "the "/"The "
+    and joins the remaining words with hyphens. Used only for
+    R8_CRITICAL_DEFICIT's hyphenated-compound-adjective phrasing
+    ("{X} demand"), the one template whose original khavda wording doesn't
+    use the plain "the X" noun-phrase form the other templates share."""
+    for prefix in ("The ", "the "):
+        if label.startswith(prefix):
+            label = label[len(prefix) :]
+            break
+    return label.replace(" ", "-")
+
+
+def reason_text_for(code: str, site: "SiteConfig") -> str:
+    """The final, site-flavored reason_text for `code` -- substitutes
+    site.critical_load_label/deferrable_load_label into REASON_CODES'
+    template for that code."""
+    return REASON_CODES[code].format(
+        critical_load_label=site.critical_load_label,
+        deferrable_load_label=site.deferrable_load_label,
+        critical_load_adjective=_adjective_form(site.critical_load_label),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +171,15 @@ class SiteConfig(BaseModel):
     horizon_hours: int = 24
     reserve_hours: int = 3
     k_uncertainty: float = 1.0
+
+    # BUGFIX-1: narrative labels substituted into REASON_CODES' templates
+    # (see reason_text_for below) so reason_text reads naturally for any
+    # site, not just Khavda's village-specific nouns. Defaults are
+    # deliberately generic; khavda's config sets these explicitly to its
+    # existing flavor text ("the health centre" / "the RO water plant /
+    # flour mill") so its reason_text output is unchanged.
+    critical_load_label: str = "critical load"
+    deferrable_load_label: str = "deferrable load"
 
 
 # ---------------------------------------------------------------------------

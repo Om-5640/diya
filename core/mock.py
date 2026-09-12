@@ -23,12 +23,48 @@ from pathlib import Path
 import numpy as np
 
 from core.types import (
-    REASON_CODES,
     KPI,
     Provenance,
     RunResult,
     StepResult,
 )
+
+# BUGFIX-1: core.types.REASON_CODES became per-site TEMPLATES (see
+# core.types.reason_text_for) so real dispatch runs can use non-khavda
+# narrative labels. This generator stays self-contained on purpose (see
+# module docstring: "does not read the YAML at runtime") and never
+# constructs a real SiteConfig, so it keeps its own frozen mirror of
+# khavda's exact wording here instead of depending on reason_text_for --
+# this is disposable Phase 0 placeholder data, not shown to real users,
+# and was never site-aware to begin with.
+_MOCK_REASON_TEXT: dict[str, str] = {
+    "R1_PREPOSITION": (
+        "Starting diesel early — low solar and wind expected this evening; "
+        "preserving battery for the health centre."
+    ),
+    "R2_SOLAR_SURPLUS": "Charging the battery from surplus solar and wind.",
+    "R3_CHEAPER_DIESEL": (
+        "Diesel is cheaper right now than discharging the battery further at "
+        "the configured costs."
+    ),
+    "R4_RESERVE_HOLD": (
+        "Holding energy in reserve — that is the health centre's supply for "
+        "the next few hours."
+    ),
+    "R5_MINLOAD": "Diesel held at minimum load — running it lower would waste fuel.",
+    "R6_AVOID_START": "Avoiding a generator start; the battery covers this gap.",
+    "R7_SHED_DEFERRABLE": (
+        "Deferring the RO water plant / flour mill to protect essential supply."
+    ),
+    "R8_CRITICAL_DEFICIT": (
+        "WARNING: health-centre demand cannot be fully met with available "
+        "capacity. This is a sizing shortfall, not a dispatch choice."
+    ),
+    "R0_NOMINAL": "Renewables are covering demand.",
+    "R9_DIESEL_ONLY": (
+        "Diesel running continuously — this baseline does not use solar, wind or battery."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Site constants mirrored from config/site_khavda.yaml (mock generator does
@@ -327,7 +363,7 @@ def make_mock_run(scenario_id: str, policy: str, seed: int = 0, n_hours: int = 1
                 curtailed_kwh=round(curtailed, 4),
                 fuel_l=fuel_l,
                 reason_code=reason_code,
-                reason_text=REASON_CODES[reason_code],
+                reason_text=_MOCK_REASON_TEXT[reason_code],
             )
         )
 

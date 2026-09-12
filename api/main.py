@@ -513,6 +513,7 @@ def _solve_live(req: LiveSolveRequest, site: SiteConfig) -> RunResult:
             k_uncertainty=site.k_uncertainty,
             diesel=site.diesel,
             battery=site.battery,
+            site=site,
         )
 
         steps.append(
@@ -933,33 +934,46 @@ def site_dispatch(
     range_hours: int = Query(168, alias="range"),
     scenario: str | None = None,
     policy: str = "mpc",
+    source: Literal["auto", "live", "precomputed"] = "auto",
 ) -> DispatchResponse:
-    """Dispatch steps for charting, from whichever source this site
-    actually has: a precomputed run's steps (truncated to `range` hours from
-    the start) if any exist, otherwise a fresh live solve.
+    """Dispatch steps for charting.
 
     Example: GET /api/sites/khavda/dispatch?range=72
 
-    If precomputed runs exist: `scenario` defaults to the first one from
-    GET .../scenarios, `policy` defaults to "mpc".
+    `source` controls where the steps come from (BUGFIX-1):
+    - "live": always a fresh live solve, even if precomputed runs exist --
+      this is the only way to get a genuine near-term forecast for a site
+      whose backfill has already completed (otherwise "auto" permanently
+      prefers historical scenario data once it exists). range must be <=72
+      in this mode; range=168 with source=live is refused (400) rather
+      than fabricated from a 72h live solve.
+    - "precomputed": always a precomputed run's steps (truncated to `range`
+      hours from the start); 404 if none exists for this site/scenario/
+      policy.
+    - "auto" (default): EXACTLY the pre-existing behavior, unchanged --
+      prefers precomputed data whenever any exists, otherwise falls back
+      to the same live solve /overview uses (always the full 72h it
+      produces, regardless of the exact range<=72 requested), refusing
+      range=168 (404) rather than fabricating a week from a 72h live solve.
 
-    If NO precomputed runs exist (a brand-new site): range<=72 falls back to
-    the same live solve /overview uses (always the full 72h it produces,
-    regardless of the exact range<=72 requested); range=168 is refused
-    rather than fabricated from a 72h live solve.
+    If precomputed runs exist (source="auto" or "precomputed"): `scenario`
+    defaults to the first one from GET .../scenarios, `policy` defaults to
+    "mpc".
 
     Errors: 404 if site_id is not registered, if no scenarios/runs are
-    available to satisfy a precomputed request, or if range=168 is
-    requested for a site with no precomputed runs ("Full week analysis
-    requires historical scenario data, not yet available for this site").
-    422 if range is anything other than 72 or 168.
+    available to satisfy a precomputed request, or (source="auto" only)
+    if range=168 is requested for a site with no precomputed runs ("Full
+    week analysis requires historical scenario data, not yet available
+    for this site"). 400 if source="live" and range=168 ("Live mode only
+    supports up to 72 hours"). 422 if range is anything other than 72 or
+    168.
     """
     if range_hours not in (72, 168):
         raise HTTPException(status_code=422, detail="range must be 72 or 168")
 
     record = _get_record_or_404(site_id)
 
-    if _has_precomputed_runs(record):
+    def _precomputed_response() -> DispatchResponse:
         scenarios = _scenario_summaries_for_site(site_id)
         scenario_id = scenario or (scenarios[0].scenario_id if scenarios else None)
         if scenario_id is None:
@@ -972,18 +986,32 @@ def site_dispatch(
             range_hours=len(steps), source="precomputed", steps=steps,
         )
 
+    def _live_response() -> DispatchResponse:
+        site = STORE.load_config(site_id)
+        live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
+        return DispatchResponse(
+            site_id=site_id, scenario_id="LIVE", policy="mpc",
+            range_hours=len(live_result.steps), source="live", steps=live_result.steps,
+        )
+
+    if source == "live":
+        if range_hours == 168:
+            raise HTTPException(status_code=400, detail="Live mode only supports up to 72 hours")
+        return _live_response()
+
+    if source == "precomputed":
+        return _precomputed_response()
+
+    # source == "auto": exactly the pre-existing behavior, unchanged.
+    if _has_precomputed_runs(record):
+        return _precomputed_response()
+
     if range_hours == 168:
         raise HTTPException(
             status_code=404,
             detail="Full week analysis requires historical scenario data, not yet available for this site",
         )
-
-    site = STORE.load_config(site_id)
-    live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
-    return DispatchResponse(
-        site_id=site_id, scenario_id="LIVE", policy="mpc",
-        range_hours=len(live_result.steps), source="live", steps=live_result.steps,
-    )
+    return _live_response()
 
 
 class DeltaValue(BaseModel):

@@ -80,3 +80,10 @@ economics:
 horizon_hours: 24
 reserve_hours: 3
 k_uncertainty: 1.0
+
+# BUGFIX-1: narrative labels substituted into REASON_CODES' templates
+# (core/types.py::reason_text_for) -- preserves Khavda's existing
+# reason_text wording exactly (verified byte-identical against its
+# precomputed runs after this refactor).
+critical_load_label: "the health centre"
+deferrable_load_label: "the RO water plant / flour mill"

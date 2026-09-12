@@ -310,14 +310,14 @@ never raises on a weather-fetch failure, only on malformed input (422).
   "site_name": "Khavda Off-Grid Microgrid",
   "steps": [
     {
-      "t": "2026-09-13T00:00:00+05:30",
+      "t": "2026-09-13T01:00:00+05:30",
       "pv_kw": 0.0,
-      "wind_kw": 0.33583472,
+      "wind_kw": 0.35749006,
       "dg_kw": 0.0,
       "dg_on": 0,
-      "batt_kw": 7.2613589,
-      "soc_kwh": 64.356464,
-      "soc_pct": 53.63038666666667,
+      "batt_kw": 7.2397036,
+      "soc_kwh": 64.379259,
+      "soc_pct": 53.6493825,
       "load_critical_kw": 1.2,
       "load_essential_kw": 6.397193634911248,
       "load_deferrable_kw": 0.0,
@@ -330,21 +330,21 @@ never raises on a weather-fetch failure, only on malformed input (422).
       "reason_text": "Avoiding a generator start; the battery covers this gap."
     },
     {
-      "t": "2026-09-13T01:00:00+05:30",
+      "t": "2026-09-13T02:00:00+05:30",
       "pv_kw": 0.0,
-      "wind_kw": 0.3707556,
+      "wind_kw": 0.46947692,
       "dg_kw": 0.0,
       "dg_on": 0,
-      "batt_kw": 7.1223686,
-      "soc_kwh": 56.859234,
-      "soc_pct": 47.382695,
+      "batt_kw": 7.0236473,
+      "soc_kwh": 56.985946,
+      "soc_pct": 47.48828833333333,
       "load_critical_kw": 1.2,
       "load_essential_kw": 6.293124212908405,
       "load_deferrable_kw": 0.0,
       "unserved_critical_kwh": 0.0,
       "unserved_essential_kwh": 0.0,
       "unserved_deferrable_kwh": 0.0,
-      "curtailed_kwh": 0.0,
+      "curtailed_kwh": 1.3239198626280313e-09,
       "fuel_l": 0.0,
       "reason_code": "R6_AVOID_START",
       "reason_text": "Avoiding a generator start; the battery covers this gap."
@@ -352,29 +352,29 @@ never raises on a weather-fetch failure, only on malformed input (422).
     "... (72 steps total, truncated for this doc)"
   ],
   "kpi": {
-    "diesel_l": 127.16847075,
-    "cost_fuel_inr": 11763.083544375,
-    "cost_total_inr": 14936.212281315,
-    "co2_kg": 340.81150161,
-    "renewable_frac": 0.5955191071968996,
+    "diesel_l": 122.4972765,
+    "cost_fuel_inr": 11330.99807625,
+    "cost_total_inr": 14315.91974829,
+    "co2_kg": 328.29270102000004,
+    "renewable_frac": 0.6048121330602786,
     "unserved_critical_kwh": 0.0,
-    "unserved_total_kwh": 139.501827722,
+    "unserved_total_kwh": 140.8056045,
     "critical_outage_hours": 0.0,
     "dg_starts": 4,
-    "dg_run_hours": 16.0,
-    "batt_equivalent_full_cycles": 2.5351907133333333,
-    "cost_per_delivered_kwh_inr": 16.006046846638814,
-    "served_kwh": 933.1606001422847,
-    "solve_ms_mean": 3177.8408999962267,
-    "solve_ms_p95": 3177.8408999962267
+    "dg_run_hours": 15.0,
+    "batt_equivalent_full_cycles": 2.5869642963333335,
+    "cost_per_delivered_kwh_inr": 15.422963856763928,
+    "served_kwh": 928.2210527914567,
+    "solve_ms_mean": 326.7996999929892,
+    "solve_ms_p95": 326.7996999929892
   },
   "provenance": {
     "weather_source": "open-meteo-forecast-live",
     "forecast_method": "open-meteo-forecast-live",
     "load_method": "synthetic-seeded-v1",
     "diesel_price_source": "PPAC Gujarat retail selling price \u2014 PLACEHOLDER, verify before demo",
-    "config_hash": "c8b5f984",
-    "generated_at": "2026-09-12T19:05:03.460787+00:00",
+    "config_hash": "a400a612",
+    "generated_at": "2026-09-12T20:18:24.111969+00:00",
     "code_version": "phase4"
   },
   "notes": "Live 72h forecast-driven plan (forecast_method=open-meteo-forecast-live)."
@@ -497,16 +497,16 @@ that scenario has no parquet data on disk.
     "batt_equivalent_full_cycles": 5.315030924580892,
     "cost_per_delivered_kwh_inr": 14.061130865971696,
     "served_kwh": 2491.973804741898,
-    "solve_ms_mean": 383.2031452384399,
-    "solve_ms_p95": 600.6490249936178
+    "solve_ms_mean": 151.26425238079156,
+    "solve_ms_p95": 235.388664999482
   },
   "provenance": {
     "weather_source": "open-meteo-archive",
     "forecast_method": "ar1-lead-scaled-noise-v1",
     "load_method": "synthetic-seeded-v1",
     "diesel_price_source": "user-override (weights applied via /api/resolve)",
-    "config_hash": "c8b5f984",
-    "generated_at": "2026-09-12T19:06:10.751983+00:00",
+    "config_hash": "a400a612",
+    "generated_at": "2026-09-12T20:18:50.633127+00:00",
     "code_version": "phase4"
   },
   "notes": "Re-solved via /api/resolve with user-adjusted weights/k_uncertainty/diesel price."
@@ -569,6 +569,22 @@ Array of `SiteSummary`:
     "lon": 69.7317,
     "created_at": "2026-01-01T00:00:00+00:00",
     "is_seed": true
+  },
+  {
+    "site_id": "site_f8aafe86",
+    "display_name": "Site A (diesel omitted)",
+    "lat": -33.9,
+    "lon": 18.4,
+    "created_at": "2026-09-12T19:59:43.543155+00:00",
+    "is_seed": false
+  },
+  {
+    "site_id": "site_bfc31dd6",
+    "display_name": "Site B (diesel=0.0 explicit)",
+    "lat": -33.9,
+    "lon": 18.4,
+    "created_at": "2026-09-12T19:59:43.580421+00:00",
+    "is_seed": false
   }
 ]
 ```
@@ -636,11 +652,11 @@ No error cases beyond standard 422 body validation.
 - Response (201):
 ```json
 {
-  "site_id": "site_79654a93",
+  "site_id": "site_aec7b7fd",
   "display_name": "API Contract Example Site",
   "lat": -33.9,
   "lon": 18.4,
-  "created_at": "2026-09-12T19:06:10.875478+00:00",
+  "created_at": "2026-09-12T20:18:50.684143+00:00",
   "is_seed": false
 }
 ```
@@ -737,7 +753,7 @@ configuration must not be silently rewritten by an API call.
 **Example:**
 
 *Partial economics update on a non-seed site*
-- Path: `/api/sites/site_79654a93`
+- Path: `/api/sites/site_aec7b7fd`
 - Request body:
 ```json
 {
@@ -754,11 +770,11 @@ configuration must not be silently rewritten by an API call.
 - Response (200):
 ```json
 {
-  "site_id": "site_79654a93",
+  "site_id": "site_aec7b7fd",
   "display_name": "API Contract Example Site",
   "lat": -33.9,
   "lon": 18.4,
-  "created_at": "2026-09-12T19:06:10.875478+00:00",
+  "created_at": "2026-09-12T20:18:50.684143+00:00",
   "is_seed": false
 }
 ```
@@ -792,7 +808,7 @@ site (khavda) -- seed sites can never be deleted through this API.
 ```
 
 *Delete a non-seed site -> 204*
-- Path: `/api/sites/site_79654a93`
+- Path: `/api/sites/site_aec7b7fd`
 - Response (204):
 ```
 ```
@@ -841,14 +857,14 @@ Errors: 404 if site_id is not registered.
 ```
 
 *A brand-new site's pipeline job shortly after creation*
-- Path: `/api/sites/site_79654a93/pipeline_status`
+- Path: `/api/sites/site_aec7b7fd/pipeline_status`
 - Response (200):
 ```json
 {
-  "site_id": "site_79654a93",
+  "site_id": "site_aec7b7fd",
   "status": "running",
-  "stage": "fetching_weather",
-  "started_at": "2026-09-12T19:06:10.908906+00:00",
+  "stage": "computing_pv_wind",
+  "started_at": "2026-09-12T20:18:50.698428+00:00",
   "finished_at": null,
   "error": null
 }
@@ -894,14 +910,14 @@ protection pattern as DELETE/PATCH.
 ```
 
 *Re-enqueuing while a job is already in progress returns the SAME job, not a duplicate*
-- Path: `/api/sites/site_79654a93/rebuild`
+- Path: `/api/sites/site_aec7b7fd/rebuild`
 - Response (200):
 ```json
 {
-  "site_id": "site_79654a93",
+  "site_id": "site_aec7b7fd",
   "status": "running",
-  "stage": "fetching_weather",
-  "started_at": "2026-09-12T19:06:10.908906+00:00",
+  "stage": "computing_pv_wind",
+  "started_at": "2026-09-12T20:18:50.698428+00:00",
   "finished_at": null,
   "error": null
 }
@@ -1158,7 +1174,7 @@ exists for that scenario_id/policy pair on this site.
 ```
 
 *A brand-new site has no precomputed runs yet -> 404*
-- Path: `/api/sites/site_79654a93/runs/S1/mpc`
+- Path: `/api/sites/site_aec7b7fd/runs/S1/mpc`
 - Response (404):
 ```json
 {
@@ -1198,7 +1214,7 @@ Errors: 404 if site_id is not registered; otherwise same as legacy
 **Example:**
 
 *Live 72h plan for the new site's own hardware/coordinates*
-- Path: `/api/sites/site_79654a93/solve_live`
+- Path: `/api/sites/site_aec7b7fd/solve_live`
 - Request body:
 ```json
 {
@@ -1212,75 +1228,75 @@ Errors: 404 if site_id is not registered; otherwise same as legacy
 {
   "scenario_id": "LIVE",
   "policy": "mpc",
-  "site_id": "site_79654a93",
+  "site_id": "site_aec7b7fd",
   "site_name": "API Contract Example Site",
   "steps": [
-    {
-      "t": "2026-09-13T00:00:00+05:30",
-      "pv_kw": 0.0,
-      "wind_kw": 0.0,
-      "dg_kw": 0.0,
-      "dg_on": 0,
-      "batt_kw": 0.0,
-      "soc_kwh": 15.0,
-      "soc_pct": 50.0,
-      "load_critical_kw": 1.2,
-      "load_essential_kw": 6.397193634911248,
-      "load_deferrable_kw": 0.0,
-      "unserved_critical_kwh": 1.2,
-      "unserved_essential_kwh": 6.3971936,
-      "unserved_deferrable_kwh": 0.0,
-      "curtailed_kwh": 0.0,
-      "fuel_l": 0.0,
-      "reason_code": "R8_CRITICAL_DEFICIT",
-      "reason_text": "WARNING: health-centre demand cannot be fully met with available capacity. This is a sizing shortfall, not a dispatch choice."
-    },
     {
       "t": "2026-09-13T01:00:00+05:30",
       "pv_kw": 0.0,
       "wind_kw": 0.0,
       "dg_kw": 0.0,
       "dg_on": 0,
-      "batt_kw": 0.855,
-      "soc_kwh": 14.1,
-      "soc_pct": 47.0,
+      "batt_kw": 1.2,
+      "soc_kwh": 13.736842,
+      "soc_pct": 45.78947333333333,
+      "load_critical_kw": 1.2,
+      "load_essential_kw": 6.397193634911248,
+      "load_deferrable_kw": 0.0,
+      "unserved_critical_kwh": 0.0,
+      "unserved_essential_kwh": 6.3971936,
+      "unserved_deferrable_kwh": 0.0,
+      "curtailed_kwh": 0.0,
+      "fuel_l": 0.0,
+      "reason_code": "R6_AVOID_START",
+      "reason_text": "Avoiding a generator start; the battery covers this gap."
+    },
+    {
+      "t": "2026-09-13T02:00:00+05:30",
+      "pv_kw": 0.0,
+      "wind_kw": 0.0,
+      "dg_kw": 0.0,
+      "dg_on": 0,
+      "batt_kw": 1.2,
+      "soc_kwh": 12.473684,
+      "soc_pct": 41.57894666666667,
       "load_critical_kw": 1.2,
       "load_essential_kw": 6.293124212908405,
       "load_deferrable_kw": 0.0,
-      "unserved_critical_kwh": 0.345,
+      "unserved_critical_kwh": 0.0,
       "unserved_essential_kwh": 6.2931242,
       "unserved_deferrable_kwh": 0.0,
       "curtailed_kwh": 0.0,
       "fuel_l": 0.0,
-      "reason_code": "R8_CRITICAL_DEFICIT",
-      "reason_text": "WARNING: health-centre demand cannot be fully met with available capacity. This is a sizing shortfall, not a dispatch choice."
+      "reason_code": "R6_AVOID_START",
+      "reason_text": "Avoiding a generator start; the battery covers this gap."
     },
     "... (72 steps total, truncated for this doc)"
   ],
   "kpi": {
     "diesel_l": 0.0,
     "cost_fuel_inr": 0.0,
-    "cost_total_inr": 69250.4953075,
+    "cost_total_inr": 63738.9814255,
     "co2_kg": 0.0,
     "renewable_frac": 1.0,
-    "unserved_critical_kwh": 41.980993355,
-    "unserved_total_kwh": 971.114303855,
-    "critical_outage_hours": 26.0,
+    "unserved_critical_kwh": 30.313803455000002,
+    "unserved_total_kwh": 964.815131755,
+    "critical_outage_hours": 17.0,
     "dg_starts": 0,
     "dg_run_hours": 0.0,
-    "batt_equivalent_full_cycles": 0.972146273,
-    "cost_per_delivered_kwh_inr": 681.947559180594,
-    "served_kwh": 101.54812400928473,
-    "solve_ms_mean": 154.3048000021372,
-    "solve_ms_p95": 154.3048000021372
+    "batt_equivalent_full_cycles": 1.3195940513333333,
+    "cost_per_delivered_kwh_inr": 611.6308258360727,
+    "served_kwh": 104.21152553645672,
+    "solve_ms_mean": 78.44459998887032,
+    "solve_ms_p95": 78.44459998887032
   },
   "provenance": {
     "weather_source": "open-meteo-forecast-live",
     "forecast_method": "open-meteo-forecast-live",
     "load_method": "synthetic-seeded-v1",
     "diesel_price_source": "manual override (example)",
-    "config_hash": "60a5ddad",
-    "generated_at": "2026-09-12T19:06:12.667868+00:00",
+    "config_hash": "14c90aa3",
+    "generated_at": "2026-09-12T20:18:51.680645+00:00",
     "code_version": "phase4"
   },
   "notes": "Live 72h forecast-driven plan (forecast_method=open-meteo-forecast-live)."
@@ -1322,7 +1338,7 @@ no scenarios uploaded yet).
 **Example:**
 
 *A brand-new site has no scenario data yet -> 404 (fast, no MILP solve)*
-- Path: `/api/sites/site_79654a93/resolve`
+- Path: `/api/sites/site_aec7b7fd/resolve`
 - Request body:
 ```json
 {
@@ -1336,10 +1352,83 @@ no scenarios uploaded yet).
   "diesel_price_inr_per_l": 92.5
 }
 ```
-- Response (404):
+- Response (200):
 ```json
 {
-  "detail": "no scenario data for S1"
+  "scenario_id": "S1",
+  "policy": "mpc",
+  "site_id": "site_aec7b7fd",
+  "site_name": "API Contract Example Site",
+  "steps": [
+    {
+      "t": "2026-03-14T00:00:00+05:30",
+      "pv_kw": 0.0,
+      "wind_kw": 0.0,
+      "dg_kw": 0.0,
+      "dg_on": 0,
+      "batt_kw": 6.771797467039842,
+      "soc_kwh": 10.87179213995806,
+      "soc_pct": 36.239307133193535,
+      "load_critical_kw": 1.2,
+      "load_essential_kw": 5.571797467039842,
+      "load_deferrable_kw": 0.0,
+      "unserved_critical_kwh": 0.0,
+      "unserved_essential_kwh": 0.0,
+      "unserved_deferrable_kwh": 0.0,
+      "curtailed_kwh": 0.0,
+      "fuel_l": 0.0,
+      "reason_code": "R6_AVOID_START",
+      "reason_text": "Avoiding a generator start; the battery covers this gap."
+    },
+    {
+      "t": "2026-03-14T01:00:00+05:30",
+      "pv_kw": 0.0,
+      "wind_kw": 0.0,
+      "dg_kw": 0.0,
+      "dg_on": 0,
+      "batt_kw": 4.628202532960157,
+      "soc_kwh": 6.0,
+      "soc_pct": 20.0,
+      "load_critical_kw": 1.2,
+      "load_essential_kw": 6.0469355908359805,
+      "load_deferrable_kw": 0.0,
+      "unserved_critical_kwh": 0.0,
+      "unserved_essential_kwh": 2.618733057875824,
+      "unserved_deferrable_kwh": 0.0,
+      "curtailed_kwh": 0.0,
+      "fuel_l": 0.0,
+      "reason_code": "R4_RESERVE_HOLD",
+      "reason_text": "Holding energy in reserve \u2014 that is critical load's supply for the next few hours."
+    },
+    "... (168 steps total, truncated for this doc)"
+  ],
+  "kpi": {
+    "diesel_l": 0.0,
+    "cost_fuel_inr": 0.0,
+    "cost_total_inr": 173434.64898069005,
+    "co2_kg": 0.0,
+    "renewable_frac": 1.0,
+    "unserved_critical_kwh": 141.85395593932054,
+    "unserved_total_kwh": 2146.3151394564834,
+    "critical_outage_hours": 103.0,
+    "dg_starts": 0,
+    "dg_run_hours": 0.0,
+    "batt_equivalent_full_cycles": 0.37999999999999995,
+    "cost_per_delivered_kwh_inr": 472.5642857690227,
+    "served_kwh": 367.0075251210593,
+    "solve_ms_mean": 53.993545237972285,
+    "solve_ms_p95": 77.67713499197271
+  },
+  "provenance": {
+    "weather_source": "open-meteo-archive",
+    "forecast_method": "ar1-lead-scaled-noise-v1",
+    "load_method": "synthetic-seeded-v1",
+    "diesel_price_source": "user-override (weights applied via /api/resolve)",
+    "config_hash": "14c90aa3",
+    "generated_at": "2026-09-12T20:19:01.911798+00:00",
+    "code_version": "phase4"
+  },
+  "notes": "Re-solved via /api/resolve with user-adjusted weights/k_uncertainty/diesel price."
 }
 ```
 
@@ -1468,14 +1557,14 @@ Errors: 404 if site_id is not registered.
     "is_seed": true
   },
   "current_step": {
-    "t": "2026-09-13T00:00:00+05:30",
+    "t": "2026-09-13T01:00:00+05:30",
     "pv_kw": 0.0,
-    "wind_kw": 0.33583472,
+    "wind_kw": 0.35749006,
     "dg_kw": 0.0,
     "dg_on": 0,
-    "batt_kw": 7.2613589,
-    "soc_kwh": 64.356464,
-    "soc_pct": 53.63038666666667,
+    "batt_kw": 7.2397036,
+    "soc_kwh": 64.379259,
+    "soc_pct": 53.6493825,
     "load_critical_kw": 1.2,
     "load_essential_kw": 6.397193634911248,
     "load_deferrable_kw": 0.0,
@@ -1493,20 +1582,20 @@ Errors: 404 if site_id is not registered.
 ```
 
 *A brand-new site: status=live_only (no precomputed runs yet)*
-- Path: `/api/sites/site_9b2c5002/overview`
+- Path: `/api/sites/site_a485a471/overview`
 - Response (200):
 ```json
 {
   "site": {
-    "site_id": "site_9b2c5002",
+    "site_id": "site_a485a471",
     "display_name": "API Contract Example Site",
     "lat": -33.9,
     "lon": 18.4,
-    "created_at": "2026-09-12T19:06:17.506720+00:00",
+    "created_at": "2026-09-12T20:19:05.450315+00:00",
     "is_seed": false
   },
   "current_step": {
-    "t": "2026-09-13T00:00:00+05:30",
+    "t": "2026-09-13T01:00:00+05:30",
     "pv_kw": 0.0,
     "wind_kw": 0.0,
     "dg_kw": 0.0,
@@ -1533,31 +1622,44 @@ Errors: 404 if site_id is not registered.
 
 ### `GET /api/sites/{site_id}/dispatch`
 
-Dispatch steps for charting, from whichever source this site
-actually has: a precomputed run's steps (truncated to `range` hours from
-the start) if any exist, otherwise a fresh live solve.
+Dispatch steps for charting.
 
 Example: GET /api/sites/khavda/dispatch?range=72
 
-If precomputed runs exist: `scenario` defaults to the first one from
-GET .../scenarios, `policy` defaults to "mpc".
+`source` controls where the steps come from (BUGFIX-1):
+- "live": always a fresh live solve, even if precomputed runs exist --
+  this is the only way to get a genuine near-term forecast for a site
+  whose backfill has already completed (otherwise "auto" permanently
+  prefers historical scenario data once it exists). range must be <=72
+  in this mode; range=168 with source=live is refused (400) rather
+  than fabricated from a 72h live solve.
+- "precomputed": always a precomputed run's steps (truncated to `range`
+  hours from the start); 404 if none exists for this site/scenario/
+  policy.
+- "auto" (default): EXACTLY the pre-existing behavior, unchanged --
+  prefers precomputed data whenever any exists, otherwise falls back
+  to the same live solve /overview uses (always the full 72h it
+  produces, regardless of the exact range<=72 requested), refusing
+  range=168 (404) rather than fabricating a week from a 72h live solve.
 
-If NO precomputed runs exist (a brand-new site): range<=72 falls back to
-the same live solve /overview uses (always the full 72h it produces,
-regardless of the exact range<=72 requested); range=168 is refused
-rather than fabricated from a 72h live solve.
+If precomputed runs exist (source="auto" or "precomputed"): `scenario`
+defaults to the first one from GET .../scenarios, `policy` defaults to
+"mpc".
 
 Errors: 404 if site_id is not registered, if no scenarios/runs are
-available to satisfy a precomputed request, or if range=168 is
-requested for a site with no precomputed runs ("Full week analysis
-requires historical scenario data, not yet available for this site").
-422 if range is anything other than 72 or 168.
+available to satisfy a precomputed request, or (source="auto" only)
+if range=168 is requested for a site with no precomputed runs ("Full
+week analysis requires historical scenario data, not yet available
+for this site"). 400 if source="live" and range=168 ("Live mode only
+supports up to 72 hours"). 422 if range is anything other than 72 or
+168.
 
 **Path/query parameters:**
 - `site_id` (path): string — required
 - `range` (query): integer
 - `scenario` (query): any
 - `policy` (query): string
+- `source` (query): string
 
 **Response schema (200):**
 - `site_id`: string (required)
@@ -1571,7 +1673,7 @@ requires historical scenario data, not yet available for this site").
 
 **Examples:**
 
-*Khavda: precomputed source, truncated to 72h*
+*Khavda: source=auto (default) prefers precomputed data, truncated to 72h*
 - Path: `/api/sites/khavda/dispatch?range=72`
 - Response (200):
 ```json
@@ -1627,19 +1729,84 @@ requires historical scenario data, not yet available for this site").
 }
 ```
 
-*A brand-new site: falls back to a live solve for range<=72*
-- Path: `/api/sites/site_9b2c5002/dispatch?range=72`
+*Khavda: source=live forces a fresh live solve even though precomputed data exists*
+- Path: `/api/sites/khavda/dispatch?range=72&source=live`
 - Response (200):
 ```json
 {
-  "site_id": "site_9b2c5002",
+  "site_id": "khavda",
   "scenario_id": "LIVE",
   "policy": "mpc",
   "range_hours": 72,
   "source": "live",
   "steps": [
     {
-      "t": "2026-09-13T00:00:00+05:30",
+      "t": "2026-09-13T01:00:00+05:30",
+      "pv_kw": 0.0,
+      "wind_kw": 0.35749006,
+      "dg_kw": 0.0,
+      "dg_on": 0,
+      "batt_kw": 7.2397036,
+      "soc_kwh": 64.379259,
+      "soc_pct": 53.6493825,
+      "load_critical_kw": 1.2,
+      "load_essential_kw": 6.397193634911248,
+      "load_deferrable_kw": 0.0,
+      "unserved_critical_kwh": 0.0,
+      "unserved_essential_kwh": 0.0,
+      "unserved_deferrable_kwh": 0.0,
+      "curtailed_kwh": 0.0,
+      "fuel_l": 0.0,
+      "reason_code": "R6_AVOID_START",
+      "reason_text": "Avoiding a generator start; the battery covers this gap."
+    },
+    {
+      "t": "2026-09-13T02:00:00+05:30",
+      "pv_kw": 0.0,
+      "wind_kw": 0.46947692,
+      "dg_kw": 0.0,
+      "dg_on": 0,
+      "batt_kw": 7.0236473,
+      "soc_kwh": 56.985946,
+      "soc_pct": 47.48828833333333,
+      "load_critical_kw": 1.2,
+      "load_essential_kw": 6.293124212908405,
+      "load_deferrable_kw": 0.0,
+      "unserved_critical_kwh": 0.0,
+      "unserved_essential_kwh": 0.0,
+      "unserved_deferrable_kwh": 0.0,
+      "curtailed_kwh": 1.3239198626280313e-09,
+      "fuel_l": 0.0,
+      "reason_code": "R6_AVOID_START",
+      "reason_text": "Avoiding a generator start; the battery covers this gap."
+    },
+    "... (72 steps total, truncated for this doc)"
+  ]
+}
+```
+
+*source=live only supports up to 72h -> 400*
+- Path: `/api/sites/khavda/dispatch?range=168&source=live`
+- Response (400):
+```json
+{
+  "detail": "Live mode only supports up to 72 hours"
+}
+```
+
+*A brand-new site: falls back to a live solve for range<=72*
+- Path: `/api/sites/site_a485a471/dispatch?range=72`
+- Response (200):
+```json
+{
+  "site_id": "site_a485a471",
+  "scenario_id": "LIVE",
+  "policy": "mpc",
+  "range_hours": 72,
+  "source": "live",
+  "steps": [
+    {
+      "t": "2026-09-13T01:00:00+05:30",
       "pv_kw": 0.0,
       "wind_kw": 0.0,
       "dg_kw": 0.0,
@@ -1659,7 +1826,7 @@ requires historical scenario data, not yet available for this site").
       "reason_text": "Avoiding a generator start; the battery covers this gap."
     },
     {
-      "t": "2026-09-13T01:00:00+05:30",
+      "t": "2026-09-13T02:00:00+05:30",
       "pv_kw": 0.0,
       "wind_kw": 0.0,
       "dg_kw": 0.0,
@@ -1684,7 +1851,7 @@ requires historical scenario data, not yet available for this site").
 ```
 
 *A brand-new site: range=168 refused rather than fabricated -> 404*
-- Path: `/api/sites/site_9b2c5002/dispatch?range=168`
+- Path: `/api/sites/site_a485a471/dispatch?range=168`
 - Response (404):
 ```json
 {

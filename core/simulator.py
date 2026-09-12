@@ -130,7 +130,8 @@ def simulate_hour_diesel_only(
     diesel: DieselSpec,
 ) -> StepResult:
     """The literal "diesel only" baseline: no renewables, no battery
-    engaged at all. Diesel (always on) alone serves load, clipped to its
+    engaged at all. Diesel (always on, unless rated_kw<=0 -- BUGFIX-1,
+    there is then nothing to be on) alone serves load, clipped to its
     rated range; anything beyond diesel's capacity is shed by the same
     deferrable -> essential -> critical priority as `simulate_hour`. Does
     NOT call `simulate_hour` — this is a deliberately separate, simpler
@@ -150,12 +151,19 @@ def simulate_hour_diesel_only(
 
     fuel_l = diesel.fuel_a_l_per_kw_h * diesel.rated_kw + diesel.fuel_b_l_per_kwh * p_dg
 
+    # BUGFIX-1: a site with no diesel genset (rated_kw<=0) has nothing to
+    # ever be "on" -- p_dg/fuel_l already correctly clip to 0 above, but
+    # dg_on was hardcoded to 1 ("always on") regardless, which made
+    # compute_kpi count a phantom dg_start for a generator that doesn't
+    # exist. Khavda always has diesel.rated_kw>0, so this is unaffected.
+    dg_on = 1 if diesel.rated_kw > 0 else 0
+
     return StepResult(
         t=t_label,
         pv_kw=0.0,
         wind_kw=0.0,
         dg_kw=p_dg,
-        dg_on=1,
+        dg_on=dg_on,
         batt_kw=0.0,
         soc_kwh=soc_prev_kwh,
         soc_pct=100.0 * soc_prev_kwh / battery.capacity_kwh,

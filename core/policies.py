@@ -51,7 +51,8 @@ def run_diesel_only(
     max_hours: int | None = None,
 ) -> list[StepResult]:
     """Literal diesel-only baseline: no renewables, no battery. dg_on is 1
-    whenever there's any load (see simulate_hour_diesel_only)."""
+    whenever there's any load, UNLESS diesel.rated_kw<=0 (no genset to be
+    on at all -- BUGFIX-1, see simulate_hour_diesel_only)."""
     df = _maybe_truncate(scenario_df, max_hours)
     battery = site.battery
     diesel = site.diesel
@@ -69,7 +70,7 @@ def run_diesel_only(
             battery=battery,
             diesel=diesel,
         )
-        code, text = reason_for_diesel_only_step(step)
+        code, text = reason_for_diesel_only_step(step, site)
         step.reason_code = code
         step.reason_text = text
         steps.append(step)
@@ -97,7 +98,14 @@ def run_rule_based(
     for row in df.itertuples():
         soc_pct_prev = 100.0 * soc_kwh / battery.capacity_kwh
         if soc_pct_prev < soc_low_pct:
-            u_dg = True
+            # BUGFIX-1: a site with no diesel genset (rated_kw<=0) must never
+            # "start" one -- simulate_hour already clips p_dg to 0 in this
+            # case (correct: diesel_l stays 0), but leaving u_dg=True still
+            # recorded dg_on=1 and counted a phantom dg_start in the KPIs
+            # for a generator that doesn't exist. Confirmed via a real new
+            # site's evidence delta: diesel_l correctly 0, dg_starts
+            # incorrectly 1.
+            u_dg = diesel.rated_kw > 0
         elif soc_pct_prev > soc_high_pct:
             u_dg = False
         else:
@@ -115,7 +123,7 @@ def run_rule_based(
             battery=battery,
             diesel=diesel,
         )
-        code, text = reason_for_reactive_step(u_dg, soc_pct_prev, step, soc_low_pct, soc_high_pct, diesel)
+        code, text = reason_for_reactive_step(u_dg, soc_pct_prev, step, soc_low_pct, soc_high_pct, diesel, site)
         step.reason_code = code
         step.reason_text = text
         steps.append(step)
@@ -193,6 +201,7 @@ def run_mpc(
             k_uncertainty=site.k_uncertainty,
             diesel=diesel,
             battery=battery,
+            site=site,
         )
 
         row = df.iloc[t]
@@ -307,6 +316,7 @@ def run_perfect_foresight(
             k_uncertainty=0.0,
             diesel=diesel,
             battery=battery,
+            site=site,
         )
 
         steps.append(

@@ -249,6 +249,63 @@ def test_toy_e_diesel_disabled_honest_shortfall_no_fuel_or_starts():
     assert plan.objective_value == pytest.approx(expected_obj, rel=1e-6)
 
 
+def _toy_f_diesel_disabled_with_reserve() -> dict:
+    """BUGFIX-1: diesel-disabled site (rated_kw=0) with a real 3-hour
+    reserve requirement -- the default for every new site
+    (core/site_store.py). Before the fix, C9's reserve floor applied
+    unconditionally, holding back battery capacity to protect against a
+    delayed/avoided diesel start even though there is no diesel here to
+    ever justify that; critical load went unserved despite the battery
+    having plenty of physical headroom and discharge power to cover it.
+    Confirmed via a real new site's live solve, then isolated here: with
+    reserve_hours=0 on this exact instance the battery already serves 100%
+    of load down to soc_min, proving reserve_hours=3 was the cause."""
+    battery = _battery(
+        capacity_kwh=20.0,
+        soc_min_pct=20.0,
+        soc_max_pct=95.0,
+        p_charge_max_kw=20.0 / 3.0,
+        p_discharge_max_kw=20.0 / 3.0,
+        eta_charge=0.95,
+        eta_discharge=0.95,
+        soc_init_pct=60.0,
+    )
+    H = 6
+    return dict(
+        pv=[0.0] * H,
+        wind=[0.0] * H,
+        critical=[1.2] * H,
+        essential=[0.0] * H,
+        deferrable=[0.0] * H,
+        battery=battery,
+        diesel=_diesel(rated_kw=0.0, min_load_frac=0.3),
+        economics=_economics(),
+        soc_init_kwh=12.0,
+        dg_on_prev=False,
+        reserve_hours=3,
+        k_uncertainty=1.0,
+    )
+
+
+def test_toy_f_diesel_disabled_reserve_never_withholds_battery_from_critical_load():
+    """The hand-verifiable isolation that diagnosed BUGFIX-1's real
+    core/milp.py bug (section 2d): with reserve_hours=3 and no diesel, the
+    battery has enough energy (12kWh, well above soc_min=4kWh) and power
+    (6.67kW >> 1.2kW/h load) to serve all 6 hours of critical load down to
+    soc_min -- it must never be held back "in reserve" for a diesel start
+    that can never happen."""
+    args = _toy_f_diesel_disabled_with_reserve()
+    plan = _solve(args)
+
+    assert plan.solve_status == "Optimal"
+    assert plan.dg_on == [0] * 6
+    assert sum(plan.unserved_critical_kwh) == pytest.approx(0.0, abs=1e-6)
+
+    battery = args["battery"]
+    soc_min_kwh = battery.soc_min_pct / 100.0 * battery.capacity_kwh
+    assert min(plan.soc_kwh) >= soc_min_kwh - 1e-6
+
+
 def _random_24h_instance(seed: int = 123) -> dict:
     """Seeded, all-four-assets-active 24h instance for invariant checks
     (no hand-verified exact values — just structural consistency)."""
