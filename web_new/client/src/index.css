@@ -125,9 +125,9 @@ a { color:inherit; text-decoration:none; }
 .location-result strong { font-size:12px; font-weight:600; }
 .location-result small { margin-top:3px; color:var(--tertiary); font-size:10px; }
 .location-empty { padding:13px; color:var(--muted); font-size:12px; }
-.map-selection { display:flex; justify-content:space-between; align-items:baseline; gap:15px; padding:10px 12px 0; }
-.map-selection strong { display:block; overflow:hidden; color:var(--ink); font-size:12px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
-.map-selection span { flex:none; color:var(--tertiary); font-size:10px; font-variant-numeric:tabular-nums; }
+.map-selection { display:flex; justify-content:space-between; align-items:baseline; gap:15px; min-width:0; padding:10px 12px 0; }
+.map-selection strong { display:block; overflow-wrap:anywhere; color:var(--ink); font-size:12px; font-weight:650; line-height:1.35; }
+.map-selection span { flex:none; color:var(--tertiary); font-size:10px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 @media (max-width:640px) { .location-results { right:0; top:93px; }.location-input-wrap { min-width:100%; }.input-row .button { width:auto; }.map-selection { align-items:flex-start; flex-direction:column; gap:3px; } }
 
 /* DIYA product polish: restrained motion, operational hierarchy, and responsive composition */
@@ -181,7 +181,7 @@ button,a,.button,.nav-link,.forecast-point,.selected-hour,.energy-flow,.impact-v
 
 .equipment-grid { gap:16px; }.equipment-field { position:relative; padding:18px 16px 16px; border:1px solid var(--border); background:var(--surface); }.equipment-field:hover { border-color:var(--border-strong); transform:translateY(-1px); }.equipment-field .equipment-kicker { display:block; margin-bottom:14px; color:var(--forest); font-size:9px; font-weight:750; letter-spacing:.13em; }.solar-field { border-top:2px solid var(--solar); }.battery-field { border-top:2px solid var(--battery); }.diesel-field { border-top:2px solid var(--diesel); }.tradeoff-line { display:flex; align-items:center; gap:10px; margin-top:27px; color:var(--tertiary); font-size:9px; font-weight:750; letter-spacing:.13em; }.tradeoff-line i { flex:1; height:1px; background:var(--border-strong); }.tradeoff-line span:nth-of-type(2) { color:var(--solar); }.tradeoff-line span:nth-of-type(3) { color:var(--healthy); }.assumption-note { border-left:2px solid var(--forest); }
 
-.map-selection > div { min-width:0; }.confirmation-label { display:block; margin-bottom:3px; color:var(--healthy); font-size:9px; font-weight:750; letter-spacing:.13em; text-transform:uppercase; }
+.map-selection > div { flex:1 1 auto; min-width:0; }.confirmation-label { display:block; margin-bottom:3px; color:var(--healthy); font-size:9px; font-weight:750; letter-spacing:.13em; text-transform:uppercase; }
 
 /* Correctness pass: make risk language and chart geometry visually unambiguous. */
 .flow-load.critical-load { border-color:#deb1aa; background:#fff9f7; color:var(--critical); }
@@ -189,7 +189,9 @@ button,a,.button,.nav-link,.forecast-point,.selected-hour,.energy-flow,.impact-v
 .flow-load.critical-load span,.critical-copy { color:var(--critical); }
 .selected-status.critical { color:var(--critical); }
 .decision-ribbon strong.critical-choice { color:var(--critical); }
-.dispatch-chart-wrap { width:100%; min-width:0; }
+.dispatch-chart-wrap { width:100%; min-width:0; overflow-x:auto; overflow-y:hidden; }
 .dispatch-chart { width:100%; min-width:0; }
 .dispatch-chart svg { width:100%; min-width:0; }
 @media (max-width:640px) { .dispatch-chart { width:calc(100vw - 97px); min-width:620px; } }
+.chart-tick.start { transform:translateX(0); text-align:left; }
+.chart-tick.end { transform:translateX(-100%); text-align:right; }
