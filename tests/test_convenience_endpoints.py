@@ -109,13 +109,38 @@ def test_geocode_forward_service_unreachable(monkeypatch):
 
 
 def test_geocode_reverse_success(monkeypatch):
-    fake = _fake_response({"display_name": "Bhuj, Kutch, Gujarat, India"})
+    # BUGFIX-2: addressdetails present -> short_display_name is a genuinely
+    # shorter "locality, region, country" composition, additive alongside
+    # the unchanged full display_name.
+    fake = _fake_response({
+        "display_name": "DAIICT, Near Indroda Circle, Gandhinagar, Gandhinagar Taluka, Gandhinagar District, Gujarat, 382007, India",
+        "address": {"city": "Gandhinagar", "state": "Gujarat", "country": "India"},
+    })
     monkeypatch.setattr("core.geocode.requests.get", lambda *a, **k: fake)
 
     resp = client.post("/api/geocode/reverse", json={"lat": 23.2419, "lon": 69.6669})
 
     assert resp.status_code == 200
-    assert resp.json() == {"display_name": "Bhuj, Kutch, Gujarat, India"}
+    data = resp.json()
+    assert data["display_name"] == (
+        "DAIICT, Near Indroda Circle, Gandhinagar, Gandhinagar Taluka, Gandhinagar District, Gujarat, 382007, India"
+    )
+    assert data["short_display_name"] == "Gandhinagar, Gujarat, India"
+    assert len(data["short_display_name"]) < len(data["display_name"])
+
+
+def test_geocode_reverse_short_name_falls_back_without_enough_address_detail(monkeypatch):
+    # No "address" block at all (or too sparse to build a shorter name) ->
+    # short_display_name just equals display_name, never a guess.
+    fake = _fake_response({"display_name": "Bhuj, Kutch, Gujarat, India"})
+    monkeypatch.setattr("core.geocode.requests.get", lambda *a, **k: fake)
+
+    resp = client.post("/api/geocode/reverse", json={"lat": 21.0, "lon": 71.0})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["display_name"] == "Bhuj, Kutch, Gujarat, India"
+    assert data["short_display_name"] == "Bhuj, Kutch, Gujarat, India"
 
 
 def test_geocode_reverse_not_found(monkeypatch):

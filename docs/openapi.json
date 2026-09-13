@@ -660,7 +660,7 @@
     "/api/geocode/reverse": {
       "post": {
         "summary": "Geocode Reverse Route",
-        "description": "Reverse geocode a (lat, lon) pair into a human-readable place name via\nOpenStreetMap Nominatim (server-side only, see core/geocode.py).\n\nExample request body: {\"lat\": 23.2419, \"lon\": 69.6669}\n\nErrors: 404 if Nominatim has no result for the coordinates. 502 if\nNominatim itself is unreachable -- never fabricates a display_name.",
+        "description": "Reverse geocode a (lat, lon) pair into a human-readable place name via\nOpenStreetMap Nominatim (server-side only, see core/geocode.py).\n\nExample request body: {\"lat\": 23.2419, \"lon\": 69.6669}\n\nReturns both display_name (Nominatim's full address, often 100+\ncharacters) and short_display_name (BUGFIX-2: a shorter \"locality,\nregion, country\" composition for UI contexts where the full name would\nbe awkwardly truncated -- falls back to display_name itself when\nNominatim's address details aren't enough to shorten it).\n\nErrors: 404 if Nominatim has no result for the coordinates. 502 if\nNominatim itself is unreachable -- never fabricates a display_name.",
         "operationId": "geocode_reverse_route_api_geocode_reverse_post",
         "requestBody": {
           "content": {
@@ -1386,11 +1386,16 @@
           "display_name": {
             "type": "string",
             "title": "Display Name"
+          },
+          "short_display_name": {
+            "type": "string",
+            "title": "Short Display Name"
           }
         },
         "type": "object",
         "required": [
-          "display_name"
+          "display_name",
+          "short_display_name"
         ],
         "title": "GeocodeReverseResult"
       },
@@ -2021,6 +2026,10 @@
           "is_seed": {
             "type": "boolean",
             "title": "Is Seed"
+          },
+          "diesel_price_inr_per_l": {
+            "type": "number",
+            "title": "Diesel Price Inr Per L"
           }
         },
         "type": "object",
@@ -2030,7 +2039,8 @@
           "lat",
           "lon",
           "created_at",
-          "is_seed"
+          "is_seed",
+          "diesel_price_inr_per_l"
         ],
         "title": "SiteSummary",
         "description": "Response shape for GET /api/sites and GET /api/sites/{site_id}."

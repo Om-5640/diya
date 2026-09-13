@@ -23,6 +23,8 @@ export type SiteSummary = {
   battery?: { capacity_kwh?: number };
   diesel?: { rated_kw?: number };
   k_uncertainty?: number;
+  // BUGFIX-2: now genuinely returned by GET/POST/PATCH /api/sites/{id}.
+  diesel_price_inr_per_l: number;
 };
 
 export type StepResult = {

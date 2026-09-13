@@ -7,8 +7,11 @@ JSON under data/raw/ so the pipeline works fully offline once cached.
 
 fetch_forecast_live() pulls from the separate Open-Meteo FORECAST API
 (https://api.open-meteo.com/v1/forecast) for the /api/solve_live endpoint's
-next-72h live plan; also caches (to data/raw/live_cache.json) so a later
-call with no network can still fall back via load_cached_forecast().
+next-72h live plan; also caches (to data/raw/live_cache_{lat}_{lon}.json,
+keyed by the requested coordinates -- BUGFIX-2: previously a single fixed
+filename shared by every site, so one site's fallback could silently serve
+another site's cached weather) so a later call with no network can still
+fall back via load_cached_forecast() for that same (lat, lon).
 
 No API key needed for either endpoint. UNIT CONVENTION: 1-hour timestep,
 kW/kWh; power in kW.
@@ -27,7 +30,11 @@ logger = logging.getLogger(__name__)
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-LIVE_CACHE_FILENAME = "live_cache.json"
+
+# BUGFIX-2: live-forecast timeout was 10s (vs. fetch_weather's 120s for the
+# same provider's archive endpoint) -- too tight a margin under real-world
+# network variability, raising the odds of an avoidable fallback.
+LIVE_FORECAST_TIMEOUT_S = 30
 
 HOURLY_VARS = [
     "shortwave_radiation",
@@ -52,6 +59,14 @@ MAX_GAP_HOURS = 3
 
 def _cache_path(cache_dir: str | Path, lat: float, lon: float, start_date: str, end_date: str) -> Path:
     return Path(cache_dir) / f"{lat}_{lon}_{start_date}_{end_date}.json"
+
+
+def _live_cache_path(cache_dir: str | Path, lat: float, lon: float) -> Path:
+    """Per-coordinate live-forecast cache path (BUGFIX-2). Rounded to 4
+    decimal places (~11m) so trivially-differing float reprs of "the same"
+    site don't fragment into separate cache files, while still keeping
+    genuinely different sites' fallbacks fully isolated."""
+    return Path(cache_dir) / f"live_cache_{lat:.4f}_{lon:.4f}.json"
 
 
 def _parse_hourly_response(raw: dict) -> pd.DataFrame:
@@ -140,7 +155,7 @@ def fetch_forecast_live(lat: float, lon: float, cache_dir: str | Path, forecast_
     """
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / LIVE_CACHE_FILENAME
+    cache_path = _live_cache_path(cache_dir, lat, lon)
 
     params = {
         "latitude": lat,
@@ -150,7 +165,7 @@ def fetch_forecast_live(lat: float, lon: float, cache_dir: str | Path, forecast_
         "wind_speed_unit": "ms",
         "forecast_days": forecast_days,
     }
-    resp = requests.get(FORECAST_URL, params=params, timeout=10)
+    resp = requests.get(FORECAST_URL, params=params, timeout=LIVE_FORECAST_TIMEOUT_S)
     resp.raise_for_status()
     raw = resp.json()
     cache_path.write_text(json.dumps(raw), encoding="utf-8")
@@ -159,11 +174,12 @@ def fetch_forecast_live(lat: float, lon: float, cache_dir: str | Path, forecast_
     return slice_next_hours(df, hours=72)
 
 
-def load_cached_forecast(cache_dir: str | Path) -> pd.DataFrame:
-    """Read the last successfully cached live forecast. Raises
-    FileNotFoundError if no cache exists yet (e.g. first-ever call with no
-    network)."""
-    cache_path = Path(cache_dir) / LIVE_CACHE_FILENAME
+def load_cached_forecast(lat: float, lon: float, cache_dir: str | Path) -> pd.DataFrame:
+    """Read the last successfully cached live forecast for this exact
+    (lat, lon) (BUGFIX-2: previously coordinate-blind, so it could return
+    another site's cached snapshot). Raises FileNotFoundError if no cache
+    exists yet for this coordinate (e.g. first-ever call with no network)."""
+    cache_path = _live_cache_path(Path(cache_dir), lat, lon)
     if not cache_path.exists():
         raise FileNotFoundError(f"no live forecast cache at {cache_path}")
     raw = json.loads(cache_path.read_text(encoding="utf-8"))

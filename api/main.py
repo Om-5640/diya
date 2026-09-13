@@ -314,6 +314,7 @@ def list_site_scenarios(site_id: str) -> list[ScenarioSummary]:
 
 
 def _to_summary(record: SiteRecord) -> SiteSummary:
+    site = STORE.load_config(record.site_id)
     return SiteSummary(
         site_id=record.site_id,
         display_name=record.display_name,
@@ -321,6 +322,7 @@ def _to_summary(record: SiteRecord) -> SiteSummary:
         lon=record.lon,
         created_at=record.created_at,
         is_seed=record.is_seed,
+        diesel_price_inr_per_l=site.economics.diesel_price_inr_per_l,
     )
 
 
@@ -427,7 +429,7 @@ def _current_hour_index(hours: int = 72) -> pd.DatetimeIndex:
     return pd.date_range(now, periods=hours, freq="h", tz="Asia/Kolkata")
 
 
-def _live_pv_wind_forecast(lat: float, lon: float, site: SiteConfig) -> tuple[list[float], list[float], str]:
+def _live_pv_wind_forecast(lat: float, lon: float, site: SiteConfig, site_id: str) -> tuple[list[float], list[float], str]:
     """Returns (pv_fc_kw, wind_fc_kw, forecast_method), trying live fetch,
     then the last successful cache, then a scenario-replay fallback --
     never raises.
@@ -443,7 +445,7 @@ def _live_pv_wind_forecast(lat: float, lon: float, site: SiteConfig) -> tuple[li
 
     if weather_df is None:
         try:
-            weather_df = load_cached_forecast(cache_dir=RAW_DIR)
+            weather_df = load_cached_forecast(lat, lon, cache_dir=RAW_DIR)
             forecast_method = "cached-fallback"
         except Exception:
             logger.warning("no live forecast cache available, falling back to scenario replay", exc_info=True)
@@ -457,14 +459,35 @@ def _live_pv_wind_forecast(lat: float, lon: float, site: SiteConfig) -> tuple[li
         wind_fc = wind_power_kw(weather_df, site.wind).tolist()
         return pv_fc, wind_fc, forecast_method
 
-    s2_path = PROCESSED_DIR / "S2.parquet"
-    s2_df = pd.read_parquet(s2_path).iloc[:72]
-    return s2_df["pv_fc_kw"].tolist(), s2_df["wind_fc_kw"].tolist(), "scenario-replay-fallback"
+    # Last resort: replay THIS site's own precomputed scenario forecast
+    # (built from its own historical weather + its own PV/wind specs during
+    # Phase E backfill) -- never another site's data. `site_id` here is the
+    # REGISTRY's site_id (the STORE lookup key), not site.site_id -- that's
+    # a separate, internal SiteConfig field (e.g. khavda's registry key is
+    # "khavda" but its config's own site_id is "khavda_01"), and passing
+    # the wrong one raises SiteNotFoundError. For khavda,
+    # scenarios_dir_path("khavda") resolves to PROCESSED_DIR, so this is
+    # byte-identical to the pre-BUGFIX-2 hardcoded PROCESSED_DIR/S2.parquet
+    # behavior. A site with no scenarios yet (never backfilled, and both
+    # live fetch and cache failed) has genuinely no real weather available
+    # for it anywhere -- return honest zeros rather than borrowing another
+    # site's numbers.
+    scenarios_dir = STORE.scenarios_dir_path(site_id)
+    fallback_path = scenarios_dir / "S2.parquet"
+    if not fallback_path.exists():
+        candidates = sorted(scenarios_dir.glob("*.parquet")) if scenarios_dir.exists() else []
+        fallback_path = candidates[0] if candidates else None
+
+    if fallback_path is not None:
+        s2_df = pd.read_parquet(fallback_path).iloc[:72]
+        return s2_df["pv_fc_kw"].tolist(), s2_df["wind_fc_kw"].tolist(), "scenario-replay-fallback"
+
+    return [0.0] * 72, [0.0] * 72, "no-data-available"
 
 
-def _solve_live(req: LiveSolveRequest, site: SiteConfig) -> RunResult:
+def _solve_live(req: LiveSolveRequest, site: SiteConfig, site_id: str) -> RunResult:
     idx = _current_hour_index(72)
-    pv_fc, wind_fc, forecast_method = _live_pv_wind_forecast(req.lat, req.lon, site)
+    pv_fc, wind_fc, forecast_method = _live_pv_wind_forecast(req.lat, req.lon, site, site_id)
 
     # SIMPLIFICATION: load is treated as perfectly known "right now", same as
     # elsewhere in this MVP -- only weather/generation is genuinely uncertain.
@@ -582,7 +605,7 @@ def solve_live(req: LiveSolveRequest) -> RunResult:
     never raises on a weather-fetch failure, only on malformed input (422).
     """
     site = STORE.load_config(KHAVDA_SITE_ID)
-    return _solve_live(req, site)
+    return _solve_live(req, site, KHAVDA_SITE_ID)
 
 
 @app.post("/api/sites/{site_id}/solve_live", response_model=RunResult)
@@ -595,7 +618,7 @@ def solve_live_for_site(site_id: str, req: LiveSolveRequest) -> RunResult:
     """
     _get_record_or_404(site_id)
     site = STORE.load_config(site_id)
-    return _solve_live(req, site)
+    return _solve_live(req, site, site_id)
 
 
 # ---------------------------------------------------------------------------
@@ -738,6 +761,11 @@ class GeocodeReverseRequest(BaseModel):
 
 class GeocodeReverseResult(BaseModel):
     display_name: str
+    # BUGFIX-2: additive -- a shorter "locality, region, country" name for
+    # UI contexts (header/breadcrumb/site-name field) where the full
+    # display_name gets awkwardly truncated. display_name's meaning/format
+    # is unchanged.
+    short_display_name: str
 
 
 # One process-lifetime cache per direction, per core/geocode.py's contract
@@ -772,6 +800,12 @@ def geocode_reverse_route(req: GeocodeReverseRequest) -> GeocodeReverseResult:
     OpenStreetMap Nominatim (server-side only, see core/geocode.py).
 
     Example request body: {"lat": 23.2419, "lon": 69.6669}
+
+    Returns both display_name (Nominatim's full address, often 100+
+    characters) and short_display_name (BUGFIX-2: a shorter "locality,
+    region, country" composition for UI contexts where the full name would
+    be awkwardly truncated -- falls back to display_name itself when
+    Nominatim's address details aren't enough to shorten it).
 
     Errors: 404 if Nominatim has no result for the coordinates. 502 if
     Nominatim itself is unreachable -- never fabricates a display_name.
@@ -828,7 +862,7 @@ def site_overview(site_id: str) -> SiteOverview:
     """
     record = _get_record_or_404(site_id)
     site = STORE.load_config(site_id)
-    live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
+    live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site, site_id)
     return SiteOverview(
         site=_to_summary(record),
         current_step=live_result.steps[0],
@@ -988,7 +1022,7 @@ def site_dispatch(
 
     def _live_response() -> DispatchResponse:
         site = STORE.load_config(site_id)
-        live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site)
+        live_result = _solve_live(LiveSolveRequest(lat=record.lat, lon=record.lon, soc_pct=60.0), site, site_id)
         return DispatchResponse(
             site_id=site_id, scenario_id="LIVE", policy="mpc",
             range_hours=len(live_result.steps), source="live", steps=live_result.steps,

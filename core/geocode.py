@@ -30,6 +30,31 @@ class GeocodeServiceError(Exception):
     status -- never fabricate a result when this happens."""
 
 
+# BUGFIX-2: priority order for picking the "locality" component of a short
+# display name -- first match wins. Nominatim's addressdetails don't
+# guarantee any single key is present (varies by place type/country), so
+# this tries the most common locality-shaped keys before falling back to
+# progressively broader ones.
+_LOCALITY_KEYS = ("city", "town", "village", "suburb", "county", "state_district")
+
+
+def _short_display_name(address: dict, fallback: str) -> str:
+    """Compose a short "locality, region, country" name from Nominatim's
+    addressdetails, e.g. "Bhuj, Gujarat, India" instead of the full
+    multi-line display_name. Falls back to the full display_name if the
+    address details don't have enough to build a shorter version from."""
+    locality = next((address[k] for k in _LOCALITY_KEYS if address.get(k)), None)
+    state = address.get("state")
+    country = address.get("country")
+
+    parts = [p for p in (locality, state, country) if p]
+    if len(parts) < 2:
+        return fallback
+    # De-duplicate adjacent identical parts (e.g. a city that IS the state).
+    deduped = [p for i, p in enumerate(parts) if i == 0 or p != parts[i - 1]]
+    return ", ".join(deduped)
+
+
 def geocode_forward(query: str, cache: dict) -> dict:
     """Free-text query -> {"lat": float, "lon": float, "display_name": str}.
 
@@ -67,7 +92,14 @@ def geocode_forward(query: str, cache: dict) -> dict:
 
 
 def geocode_reverse(lat: float, lon: float, cache: dict) -> dict:
-    """(lat, lon) -> {"display_name": str}.
+    """(lat, lon) -> {"display_name": str, "short_display_name": str}.
+
+    short_display_name (BUGFIX-2) is a shorter "locality, region, country"
+    composition (e.g. "Bhuj, Gujarat, India") built from Nominatim's own
+    address components, for UI contexts where the full ~100+-character
+    display_name gets awkwardly truncated. display_name's own meaning/format
+    is unchanged; when address details aren't enough to build a shorter
+    name, short_display_name just equals display_name.
 
     `cache` is a plain dict the caller owns, keyed by (lat, lon) rounded to
     6 decimals (~0.1m precision) so trivially-different float noise doesn't
@@ -83,7 +115,7 @@ def geocode_reverse(lat: float, lon: float, cache: dict) -> dict:
     try:
         resp = requests.get(
             NOMINATIM_REVERSE_URL,
-            params={"lat": lat, "lon": lon, "format": "json"},
+            params={"lat": lat, "lon": lon, "format": "json", "addressdetails": 1},
             headers={"User-Agent": USER_AGENT},
             timeout=REQUEST_TIMEOUT_S,
         )
@@ -97,6 +129,10 @@ def geocode_reverse(lat: float, lon: float, cache: dict) -> dict:
     if not raw or "error" in raw or "display_name" not in raw:
         raise GeocodeNotFoundError(f"no geocoding result for lat={lat}, lon={lon}")
 
-    result = {"display_name": raw["display_name"]}
+    display_name = raw["display_name"]
+    result = {
+        "display_name": display_name,
+        "short_display_name": _short_display_name(raw.get("address") or {}, display_name),
+    }
     cache[key] = result
     return result

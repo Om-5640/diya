@@ -354,6 +354,9 @@ class SiteSummary(BaseModel):
     lon: float
     created_at: str
     is_seed: bool
+    # BUGFIX-2: added so Manage can show the site's current diesel price
+    # without a separate call -- additive, does not change any other field.
+    diesel_price_inr_per_l: float
 
 
 # ---------------------------------------------------------------------------
