@@ -1,5 +1,7 @@
 # DIYA — Dispatch Intelligence for Yield & Autonomy
 
+### Live Website: [https://wattforecast.pages.dev/](https://wattforecast.pages.dev/)
+
 **A forecast-aware dispatch brain for off-grid microgrids — built to prove, hour by hour, that a real-time optimizer beats a rule of thumb, and to explain in plain language why it chose what it chose.**
 
 DIYA takes a solar/wind/battery/diesel hybrid microgrid — currently modeling a real off-grid site at **Khavda, Kutch, Gujarat, India**, serving a health centre (critical load), household/business demand (essential load), and an RO water plant / flour mill (deferrable load) — and answers one question every hour: *given what the weather is about to do, what should this system run right now, and why?*
