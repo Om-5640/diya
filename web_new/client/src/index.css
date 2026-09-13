@@ -126,7 +126,7 @@ a { color:inherit; text-decoration:none; }
 .location-result small { margin-top:3px; color:var(--tertiary); font-size:10px; }
 .location-empty { padding:13px; color:var(--muted); font-size:12px; }
 .map-selection { display:flex; justify-content:space-between; align-items:baseline; gap:15px; padding:10px 12px 0; }
-.map-selection strong { overflow:hidden; color:var(--ink); font-size:12px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+.map-selection strong { display:block; overflow:hidden; color:var(--ink); font-size:12px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
 .map-selection span { flex:none; color:var(--tertiary); font-size:10px; font-variant-numeric:tabular-nums; }
 @media (max-width:640px) { .location-results { right:0; top:93px; }.location-input-wrap { min-width:100%; }.input-row .button { width:auto; }.map-selection { align-items:flex-start; flex-direction:column; gap:3px; } }
 
